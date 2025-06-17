@@ -460,7 +460,7 @@
 
             try {
                 const response = await callGemini(contents);
-                const planText = response.candidates[0].content.parts[0].text;
+                const planText = response.candidates[0].content.parts[0].text.replace(/```markdown\s*([\s\S]*?)\s*```/g, '$1'); // Remove code block formatting
                 planningContainer.innerHTML = marked.parse(planText);
             } catch (error) {
                 planningContainer.innerHTML = `<p class="text-red-500">Error generating implementation plan: ${error.message}</p>`;
