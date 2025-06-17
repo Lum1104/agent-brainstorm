@@ -1,148 +1,96 @@
-# 🧠 Agent Brainstorm
+# Multi-Agent Brainstorming System
 
 **[中文版 / Chinese Version](./README-zh.md)**
 
-A multi-agent brainstorming tool powered by AI agents to help you with creative thinking and idea expansion.
-
-## 🚀 Quick Start
-
 **Try it now:** [https://lum1104.github.io/agent-brainstorm/](https://lum1104.github.io/agent-brainstorm/)
 
-No installation required! Just open the link, enter your Google Gemini API key, and start brainstorming.
+A client-side AI agent system that runs entirely in your browser, utilizing Google's Gemini API to facilitate structured brainstorming sessions through multiple AI personas.
 
-## ✨ Project Overview
+## Overview
 
-Agent Brainstorm is a fully client-side multi-agent brainstorming system. Simply enter a brief idea or topic, and the system will automatically assemble an expert team to help you generate innovative ideas and create implementation plans through a structured five-stage process.
+This system implements a 5-stage brainstorming methodology using AI agents to generate, evaluate, and refine ideas for both project development and research papers. The entire process runs locally in your browser with no server-side dependencies.
 
-## 🚀 Core Features
+## Features
 
-### 🎯 Intelligent Team Assembly
-- **Preview Agent Analysis**: AI analyzes your topic and automatically assembles 4 domain experts
-- **Dynamic Role Generation**: Dynamically creates AI agents with different backgrounds and expertise based on topic characteristics
+### 🤖 Multi-Agent Architecture
+- **Preview Agent**: Assembles expert teams with distinct personas
+- **RAG Agent**: Provides contextual research and background information
+- **Ideation Agents**: Generate diverse ideas from different perspectives
+- **Critic Agent**: Evaluates and ranks generated ideas
+- **Expert Agent**: Creates detailed implementation plans
 
-### 💡 Structured Creative Process
-1. **Topic Definition & Team Assembly**: Input your idea, AI automatically analyzes and assembles expert team
-2. **Divergent Thinking**: Expert agents independently generate innovative ideas
-3. **Convergent Evaluation**: Critical analysis and idea clustering
-4. **Solution Selection**: Evaluate ideas based on novelty, feasibility, and impact
-5. **Implementation Planning**: Generate detailed project implementation plans for selected ideas
+### 📋 Two Brainstorming Modes
+1. **Project Ideas**: For products, features, and development projects
+2. **Research Papers**: For academic topics, studies, and research questions
 
-### 🛡️ Privacy & Security
-- **Client-Side Operation**: All processing happens entirely in your browser
-- **API Key Security**: Your Google Gemini API key is only used in local sessions, never uploaded
-- **Data Protection**: No registration required, no data collection
+### 🔄 5-Stage Workflow
+1. **Define Direction & Assemble Team**: Configure personas based on your topic
+2. **Context via RAG Agent**: Gather relevant background information
+3. **Divergent Ideation**: Generate multiple ideas from different perspectives
+4. **Convergent Evaluation**: Analyze, cluster, and rank ideas
+5. **Final Document Generation**: Create detailed plans for selected ideas
 
-## 🔧 Tech Stack
+## Getting Started
 
-- **Frontend Framework**: Native HTML/CSS/JavaScript
-- **UI Styling**: Tailwind CSS
-- **Markdown Rendering**: Marked.js
-- **AI Model**: Google Gemini 2.0 Flash
-- **Typography**: Inter Font Family
-
-## 📋 Prerequisites
-
-### Obtain Google Gemini API Key
-
-1. Visit [Google AI Studio](https://aistudio.google.com/apikey)
-2. Sign in to your Google account
-3. Create a new API key
-4. Copy the generated key
-
-### System Requirements
-
+### Prerequisites
 - Modern web browser (Chrome, Firefox, Safari, Edge)
-- Stable internet connection
-- Valid Google Gemini API key
+- Google Gemini API Key (free from [Google AI Studio](https://aistudio.google.com/apikey))
 
-## 🎮 Usage Guide
+### Setup
+1. Clone or download this repository
+2. Open `index.html` in your web browser
+3. Enter your Google Gemini API Key in the settings section
+4. Start brainstorming!
 
-### Step 1: Configure API Key
-1. Open the application
-2. Enter your Google Gemini API key in the settings area
-3. Click the "Save Key" button
+### API Key Setup
+1. Visit [Google AI Studio](https://aistudio.google.com/apikey)
+2. Create a free account if needed
+3. Generate an API key
+4. Enter the key in the application settings
+5. Your key is stored securely in your browser session only
 
-### Step 2: Start Brainstorming
-1. Enter your idea or topic in the input field
-   - Example: `"Using LLM for Human-Computer Interaction course project"`
-2. Click "Assemble Team & Brainstorm"
+## How to Use
 
-### Step 3: Observe AI Workflow
-1. **Team Assembly**: Watch how AI analyzes your topic and assembles expert team
-2. **Idea Generation**: Expert agents sequentially generate innovative ideas
-3. **Evaluation & Analysis**: System automatically analyzes, clusters, and evaluates all ideas
-4. **Solution Selection**: Choose from the top 3 recommended ideas for detailed planning
+### Step 1: Configuration
+- Select your brainstorming type (Project or Research Paper)
+- Enter your topic (e.g., "Using LLM for the course project of HCI")
+- Click "Start Brainstorm"
 
-### Step 4: Get Implementation Plan
-- Click the "Plan" button for any recommended idea
-- System generates detailed plans including requirements analysis, tech stack, timeline, and resource assessment
+### Step 2: Review Expert Team
+The Preview Agent will automatically assemble a team of 4 expert personas relevant to your topic, each with:
+- **Role**: Their area of expertise
+- **Goal**: What they aim to achieve
+- **Backstory**: Their professional background
 
-## 🌟 Use Cases
+### Step 3: Contextual Research
+The RAG Agent provides background information and current state-of-the-art knowledge about your topic.
 
-- **Academic Research**: Course projects, thesis topics, research direction exploration
-- **Product Development**: New product concepts, feature design, user experience improvement
-- **Business Planning**: Business model innovation, market strategy, solution design
-- **Technical Innovation**: Technology applications, architecture design, tool development
-- **Creative Writing**: Story conception, script writing, content planning
+### Step 4: Idea Generation
+Each expert persona generates 5 unique ideas. You can:
+- Review all generated ideas
+- Uncheck ideas you want to exclude
+- Select the most promising concepts
 
-## 📁 Project Structure
+### Step 5: Evaluation & Ranking
+The Critic Agent:
+- Analyzes and clusters similar ideas
+- Evaluates each concept on multiple criteria
+- Provides detailed justifications
+- Ranks the top 3 recommendations
 
-```
-agent-brainstorm/
-├── index.html          # Main application file
-├── README.md           # Project documentation (English)
-├── README-zh.md        # Project documentation (Chinese)
-└── (no other dependencies)
-```
+### Step 6: Implementation Planning
+Select one of the top ideas to generate:
+- **For Projects**: Implementation plan with requirements, tech stack, timeline, and resources
+- **For Research**: Research outline with methodology, literature review, and publication targets
 
-## 🎨 Interface Features
+## Example Use Cases
 
-- **Responsive Design**: Adapts to desktop and mobile devices
-- **Real-time Progress Feedback**: Clear loading states and processing progress
-- **Elegant UI Animations**: Smooth transitions and interaction feedback
-- **Staged Display**: Progressive revelation of workflow and results
+### Project Development
+- "Mobile app for university students"
+- "AI-powered learning platform"
+- "Sustainable energy management system"
 
-## ⚡ Performance Optimization
-
-- **API Rate Limiting**: Intelligent delays to avoid triggering frequency limits
-- **Error Handling**: Comprehensive error catching with user-friendly error messages
-- **Content Safety Filtering**: Automatic processing and display of safe content
-
-## 🔒 Security Notes
-
-- API key is only stored in current browser session
-- Your key is never sent to any third-party services
-- Need to re-enter key after page refresh
-- Recommend regular API key rotation
-
-## 🛠️ Local Development
-
-1. Clone or download project files
-2. Open `index.html` with a local server (recommended)
-   ```bash
-   # Using Python
-   python -m http.server 8000
-   
-   # Using Node.js
-   npx serve .
-   ```
-3. Or directly open `index.html` file in browser
-
-## 📝 License
-
-This project is licensed under the MIT License. See project files for details.
-
-## 🤝 Contributing
-
-Welcome to submit issue reports, feature requests, or improvement suggestions!
-
-## 📞 Support
-
-If you encounter problems, please check:
-1. Whether API key is correctly set
-2. Whether network connection is stable
-3. Whether there are error messages in browser console
-
----
-
-**Start your creative journey!** 🚀
+### Research Papers
+- "Machine learning in healthcare"
+- "Human-computer interaction studies"
+- "Climate change mitigation strategies"
