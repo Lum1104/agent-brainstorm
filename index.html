@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Brainstorming System (Client-Side)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .agent-card {
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        .stage-title {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .loader {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .prose h1,
+        .prose h2,
+        .prose h3 {
+            font-weight: 600;
+        }
+
+        .prose ul {
+            list-style-type: disc;
+            margin-left: 1.5rem;
+        }
+
+        .prose table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .prose th,
+        .prose td {
+            border: 1px solid #d1d5db;
+            padding: 0.5rem 1rem;
+        }
+
+        .prose th {
+            background-color: #f9fafb;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Multi-Agent Brainstorming System</h1>
+            <p class="mt-2 text-lg text-gray-600">A Client-Side AI Agent System Running in Your Browser</p>
+        </header>
+
+        <!-- SETTINGS: API KEY INPUT -->
+        <div id="settings-container" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-lg">
+            <h2 class="text-xl font-semibold text-gray-800">Settings</h2>
+            <p class="text-gray-700 mt-2 mb-4">Please enter your Google Gemini API Key to use this application. Your key
+                is secure and never leaves your browser.</p>
+
+            <p class="text-gray-700 mt-2 mb-4">
+                You can get your free API Key from <a href="https://aistudio.google.com/apikey" target="_blank"
+                    class="text-yellow-600 font-semibold hover:underline">Google AI Studio</a>.
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="password" id="api-key-input" placeholder="Enter your Google API Key"
+                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none transition">
+                <button id="save-key-btn"
+                    class="bg-yellow-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-yellow-600 transition-all duration-200">Save
+                    Key</button>
+            </div>
+            <p id="key-status" class="text-sm mt-2 text-green-700 font-semibold hidden">API Key has been set for this
+                session. Your key is secure and never leaves your browser.</p>
+        </div>
+
+
+        <!-- STAGE 1: INPUT & PREVIEW AGENT -->
+        <div id="stage-1-container" class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 1: Define Direction & Assemble Team</h2>
+            <p class="text-gray-600 mb-4">Enter a high-level topic. The Preview Agent will analyze it and dynamically
+                assemble a team of specialized AI agents for the brainstorming session.</p>
+            <form id="brainstorm-form" class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="topic-input" placeholder="e.g., 'Using LLM for the course project of HCI.'"
+                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                <button type="submit" id="start-btn"
+                    class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center justify-center"
+                    disabled>
+                    <span id="start-btn-text">Assemble Team & Brainstorm</span>
+                </button>
+            </form>
+            <div id="preview-agent-loader" class="hidden flex-col items-center mt-6">
+                <div class="loader"></div>
+                <p class="mt-2 text-gray-600">Preview Agent is analyzing the topic and assembling the expert team...</p>
+            </div>
+            <!-- Changed grid layout for personas for better responsiveness -->
+            <div id="persona-container" class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- STAGE 2: DIVERGENT IDEATION -->
+        <div id="stage-2-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 2: Divergent Ideation (Sequential
+                Brainstorming)</h2>
+            <p class="text-gray-600 mb-4">The specialized agents are now working sequentially to generate a wide range
+                of ideas, with a delay between each agent to respect API rate limits.</p>
+            <div id="divergent-loader" class="flex flex-col items-center mt-6">
+                <div class="loader"></div>
+                <p class="mt-2 text-gray-600">Ideation in progress... agents are brainstorming one by one...</p>
+            </div>
+            <!-- Changed to a single-column grid to display agent responses vertically -->
+            <div id="ideas-container" class="mt-6 grid grid-cols-1 gap-6"></div>
+            <div class="text-center mt-8">
+                <button id="to-convergent-btn"
+                    class="hidden bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition-all duration-200">
+                    Proceed to Evaluation
+                </button>
+            </div>
+        </div>
+
+        <!-- STAGE 3 & 4: CONVERGENT EVALUATION -->
+        <div id="stage-3-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 3 & 4: Convergent Evaluation (Critique &
+                Selection)</h2>
+            <p class="text-gray-600 mb-4">The Supervisor Agent has collected all ideas. Now, a Critic Agent will
+                analyze, cluster, and evaluate them based on novelty, feasibility, and impact to identify the most
+                promising concepts.</p>
+            <div id="convergent-loader" class="flex flex-col items-center mt-6">
+                <div class="loader"></div>
+                <p class="mt-2 text-gray-600">Supervisor and Critic agents are analyzing and ranking ideas...</p>
+            </div>
+            <div id="evaluation-container" class="prose max-w-none mt-6"></div>
+            <!-- New container for the "Top 3" buttons to ensure they always render -->
+            <div id="top-ideas-container" class="mt-8"></div>
+        </div>
+
+        <!-- STAGE 5: IMPLEMENTATION PLANNING -->
+        <div id="stage-5-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 5: Implementation Planning</h2>
+            <p class="text-gray-600 mb-4">The AI Project Manager has generated a high-level implementation plan for the
+                selected idea.</p>
+            <div id="planning-loader" class="flex flex-col items-center mt-6">
+                <div class="loader"></div>
+                <p class="mt-2 text-gray-600">AI Project Manager is drafting the implementation plan...</p>
+            </div>
+            <div id="planning-container" class="prose max-w-none mt-6"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- CONFIGURATION & STATE ---
+        let userApiKey = null; // Variable to hold the user's API key for the session.
+
+        // --- DOM ELEMENT REFERENCES ---
+        const apiKeyInput = document.getElementById('api-key-input');
+        const saveKeyBtn = document.getElementById('save-key-btn');
+        const keyStatus = document.getElementById('key-status');
+        const brainstormForm = document.getElementById('brainstorm-form');
+        const topicInput = document.getElementById('topic-input');
+        const startBtn = document.getElementById('start-btn');
+        const previewAgentLoader = document.getElementById('preview-agent-loader');
+        const personaContainer = document.getElementById('persona-container');
+        const stage2Container = document.getElementById('stage-2-container');
+        const divergentLoader = document.getElementById('divergent-loader');
+        const ideasContainer = document.getElementById('ideas-container');
+        const toConvergentBtn = document.getElementById('to-convergent-btn');
+        const stage3Container = document.getElementById('stage-3-container');
+        const convergentLoader = document.getElementById('convergent-loader');
+        const evaluationContainer = document.getElementById('evaluation-container');
+        const topIdeasContainer = document.getElementById('top-ideas-container');
+        const stage5Container = document.getElementById('stage-5-container'); // Corrected from stage-4
+        const planningLoader = document.getElementById('planning-loader');
+        const planningContainer = document.getElementById('planning-container');
+        let allRawIdeas = [];
+
+
+        // --- GEMINI API HELPER ---
+        async function callGemini(contents, generationConfig = {}) {
+            if (!userApiKey) {
+                alert("Please set your Google API Key in the settings before proceeding.");
+                throw new Error("API Key not set.");
+            }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${userApiKey}`;
+            const payload = { contents, generationConfig };
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    console.error("API Error Response Body:", errorBody);
+                    throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+                }
+                const result = await response.json();
+
+                if (result.error) {
+                    console.error("API Error Response:", result.error);
+                    throw new Error(`API returned an error: ${result.error.message}`);
+                }
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content) {
+                    return result;
+                } else {
+                    console.warn("API response missing candidates or content:", result);
+                    // Check for safety ratings block
+                    if (result.candidates && result.candidates[0]?.finishReason === 'SAFETY') {
+                        throw new Error("Content blocked by safety settings. Please try a different topic.");
+                    }
+                    throw new Error("Received an invalid or empty response from the Gemini API.");
+                }
+            } catch (error) {
+                console.error("Error in callGemini function:", error);
+                // Display a more user-friendly error
+                alert(`An error occurred while communicating with the API. Please check the console for details. Error: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // --- UI & WORKFLOW LOGIC ---
+        saveKeyBtn.addEventListener('click', () => {
+            const key = apiKeyInput.value.trim();
+            if (key) {
+                userApiKey = key;
+                keyStatus.textContent = "API Key has been set for this session. Your key is secure and never leaves your browser.";
+                keyStatus.classList.remove('hidden');
+                apiKeyInput.value = ''; // Clear the input for security
+                apiKeyInput.type = "password"; // Re-mask
+                startBtn.disabled = false; // Enable the main button
+                // Use a less intrusive notification
+                setTimeout(() => keyStatus.classList.add('hidden'), 3000);
+            } else {
+                alert("Please enter a valid API key.");
+            }
+        });
+
+        brainstormForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userApiKey) {
+                alert("Please save your API key first!");
+                return;
+            }
+            const topic = topicInput.value.trim();
+            if (!topic) {
+                alert('Please enter a topic to brainstorm.');
+                return;
+            }
+
+            // Reset UI for a new run
+            [stage2Container, stage3Container, stage5Container].forEach(el => el.classList.add('hidden'));
+            [personaContainer, ideasContainer, evaluationContainer, topIdeasContainer, planningContainer].forEach(el => el.innerHTML = '');
+            toConvergentBtn.classList.add('hidden');
+            allRawIdeas = []; // Clear previous ideas
+
+            const personas = await runPreviewAgent(topic);
+            if (personas && personas.length > 0) {
+                await runDivergentIdeation(topic, personas);
+            }
+        });
+
+        function showLoader(loaderElement, buttonElement = null, btnTextSpan = null, newText = '') {
+            loaderElement.classList.remove('hidden');
+            loaderElement.classList.add('flex');
+            if (buttonElement) {
+                buttonElement.disabled = true;
+                if (btnTextSpan && newText) btnTextSpan.textContent = newText;
+            }
+        }
+
+        function hideLoader(loaderElement, buttonElement = null, btnTextSpan = null, originalText = '') {
+            loaderElement.classList.add('hidden');
+            loaderElement.classList.remove('flex');
+            if (buttonElement) {
+                buttonElement.disabled = false;
+                if (btnTextSpan && originalText) btnTextSpan.textContent = originalText;
+            }
+        }
+
+        function sanitizeHTML(str) {
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
+        async function runPreviewAgent(topic) {
+            showLoader(previewAgentLoader, startBtn, document.getElementById('start-btn-text'), "Assembling Team...");
+            personaContainer.innerHTML = '';
+            ideasContainer.innerHTML = ''; // Also clear the idea placeholders
+
+            const schema = {
+                type: "OBJECT",
+                properties: { personas: { type: "ARRAY", items: { type: "OBJECT", properties: { role: { "type": "STRING" }, goal: { "type": "STRING" }, backstory: { "type": "STRING" } }, required: ["role", "goal", "backstory"] } } },
+                required: ["personas"]
+            };
+
+            const prompt = `You are a world-class innovation consultant. The user wants to brainstorm ideas for '${sanitizeHTML(topic)}'. Your task is to identify and define 4 distinct, expert personas. For each, provide their Role, Goal, and Backstory.`;
+            const contents = [{ role: "user", parts: [{ text: prompt }] }];
+
+            try {
+                const response = await callGemini(contents, { responseMimeType: "application/json", responseSchema: schema });
+                const personaData = JSON.parse(response.candidates[0].content.parts[0].text);
+
+                hideLoader(previewAgentLoader, startBtn, document.getElementById('start-btn-text'), "Assemble Team & Brainstorm");
+                stage2Container.classList.remove('hidden');
+
+                personaData.personas.forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = 'agent-card bg-white p-4 rounded-lg border';
+                    card.innerHTML = `<h3 class="font-bold text-blue-600">${sanitizeHTML(p.role)}</h3><p class="text-sm text-gray-500 mt-1"><strong>Goal:</strong> ${sanitizeHTML(p.goal)}</p><p class="text-sm text-gray-500 mt-1"><strong>Backstory:</strong> ${sanitizeHTML(p.backstory)}</p>`;
+                    personaContainer.appendChild(card);
+
+                    // Create placeholder in the vertical layout
+                    const ideaCardContainer = document.createElement('div');
+                    ideaCardContainer.id = `idea-card-${p.role.replace(/\s+/g, '-')}`;
+                    ideaCardContainer.className = 'agent-card bg-white p-4 rounded-lg border min-h-[10rem]'; // min-h for consistent size
+                    ideaCardContainer.innerHTML = `
+                        <h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(p.role)}</h3>
+                        <div class="flex items-center justify-center h-full">
+                            <div class="loader"></div>
+                        </div>
+                    `;
+                    ideasContainer.appendChild(ideaCardContainer);
+                });
+
+                return personaData.personas;
+
+            } catch (error) {
+                hideLoader(previewAgentLoader, startBtn, document.getElementById('start-btn-text'), "Assemble Team & Brainstorm");
+                personaContainer.innerHTML = `<p class="text-red-500 text-center col-span-full">Error: Could not assemble the agent team. Check your API Key and console for details.</p>`;
+                return null;
+            }
+        }
+
+        async function runDivergentIdeation(topic, personas) {
+            showLoader(divergentLoader);
+            allRawIdeas = [];
+            const RATE_LIMIT_DELAY = 1000; // 1 second delay between API calls
+
+            for (const persona of personas) {
+                const prompt = `Your Persona:\n- Role: ${persona.role}\n- Backstory: ${persona.backstory}\n- Goal: ${persona.goal}\n\nBased on your unique persona, brainstorm 5 innovative ideas about '${sanitizeHTML(topic)}'. Your primary goal is quantity and novelty. Do NOT critique or evaluate your own ideas. Present your ideas as a simple bulleted list in Markdown.`;
+                const contents = [{ role: "user", parts: [{ text: prompt }] }];
+
+                try {
+                    const response = await callGemini(contents);
+                    const ideasText = response.candidates[0].content.parts[0].text;
+                    allRawIdeas.push({ role: persona.role, ideas: ideasText }); // Store with role for context
+                    const ideaCard = document.getElementById(`idea-card-${persona.role.replace(/\s+/g, '-')}`);
+                    if (ideaCard) {
+                        // Render the response in the card
+                        ideaCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3><div class="prose prose-sm max-w-none text-gray-700 p-2">${marked.parse(ideasText)}</div>`;
+                    }
+                } catch (error) {
+                    const ideaCard = document.getElementById(`idea-card-${persona.role.replace(/\s+/g, '-')}`);
+                    if (ideaCard) {
+                        ideaCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3><p class="text-red-500 p-2 text-center">Error generating ideas. Please check console.</p>`;
+                    }
+                }
+                await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
+            }
+
+            hideLoader(divergentLoader);
+            if (allRawIdeas.length > 0) {
+                toConvergentBtn.classList.remove('hidden');
+            }
+        }
+
+        async function runConvergentEvaluation() {
+            showLoader(convergentLoader);
+            evaluationContainer.innerHTML = '';
+            topIdeasContainer.innerHTML = '';
+
+            const rawIdeasString = allRawIdeas.map(item => `Ideas from ${item.role}:\n${item.ideas}`).join('\n\n---\n\n');
+            const prompt = `You are a Chief Analyst. You have received a list of raw, brainstormed ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. De-duplicate them and group similar concepts.\n2. **Critique & Evaluate:** For each unique, clustered idea, provide a critical evaluation in a markdown table with columns: 'Idea Cluster', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 ideas:'. Then, provide a JSON array of objects for the top 3 ideas you recommend. Each object needs 'title' and 'description' keys. This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n${rawIdeasString}\n---`;
+            const contents = [{ role: "user", parts: [{ text: prompt }] }];
+
+            try {
+                const response = await callGemini(contents);
+                const evaluationText = response.candidates[0].content.parts[0].text;
+                const jsonMatch = evaluationText.match(/```json\s*([\s\S]*?)\s*```/);
+
+                let topIdeas = [];
+                let evaluationMarkdown = evaluationText;
+
+                if (jsonMatch && jsonMatch[1]) {
+                    try {
+                        topIdeas = JSON.parse(jsonMatch[1]);
+                        // Remove the JSON block from the text to be rendered as Markdown
+                        evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').trim();
+                    } catch (e) {
+                        console.error("Failed to parse top ideas JSON:", e);
+                        topIdeasContainer.innerHTML = `<p class="text-yellow-600">Could not parse the Top 3 ideas JSON from the response, but the analysis is below.</p>`;
+                    }
+                }
+
+                // Render the main analysis
+                evaluationContainer.innerHTML = marked.parse(evaluationMarkdown);
+
+                // **FIX**: Render the buttons in their dedicated container
+                if (topIdeas.length > 0) {
+                    const header = document.createElement('h3');
+                    header.className = 'text-xl font-semibold text-gray-700 stage-title';
+                    header.textContent = 'Select a Top Idea to Plan';
+                    topIdeasContainer.appendChild(header);
+
+                    const listContainer = document.createElement('div');
+                    listContainer.className = 'flex flex-col sm:flex-row gap-4 mt-4';
+
+                    topIdeas.forEach(idea => {
+                        const planBtn = document.createElement('button');
+                        planBtn.className = 'bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all duration-200 text-left';
+                        planBtn.innerHTML = `<span class="font-bold">Plan:</span> ${sanitizeHTML(idea.title)}`;
+                        planBtn.onclick = () => runImplementationPlanning(idea);
+                        listContainer.appendChild(planBtn);
+                    });
+                    topIdeasContainer.appendChild(listContainer);
+                }
+
+            } catch (error) {
+                evaluationContainer.innerHTML = `<p class="text-red-500">Error during evaluation: ${error.message}</p>`;
+            } finally {
+                hideLoader(convergentLoader);
+            }
+        }
+
+        async function runImplementationPlanning(idea) {
+            stage5Container.classList.remove('hidden');
+            window.scrollTo({ top: stage5Container.offsetTop, behavior: 'smooth' });
+            showLoader(planningLoader);
+            planningContainer.innerHTML = '';
+
+            const prompt = `You are an expert AI Project Manager. A promising idea has been selected. Generate a detailed, concise project initiation document in Markdown.\n\n**Selected Idea:**\n- **Title:** ${sanitizeHTML(idea.title)}\n- **Description:** ${sanitizeHTML(idea.description)}\n\nPlease include these sections:\n### High-Level Requirements & User Stories\n### Proposed Technology Stack\n### Phased Project Timeline (with estimated weeks)\n### Initial Resource Estimation (roles needed)`;
+            const contents = [{ role: "user", parts: [{ text: prompt }] }];
+
+            try {
+                const response = await callGemini(contents);
+                const planText = response.candidates[0].content.parts[0].text;
+                planningContainer.innerHTML = marked.parse(planText);
+            } catch (error) {
+                planningContainer.innerHTML = `<p class="text-red-500">Error generating implementation plan: ${error.message}</p>`;
+            } finally {
+                hideLoader(planningLoader);
+            }
+        }
+
+        toConvergentBtn.addEventListener('click', () => {
+            stage3Container.classList.remove('hidden');
+            window.scrollTo({ top: stage3Container.offsetTop, behavior: 'smooth' });
+            toConvergentBtn.classList.add('hidden');
+            runConvergentEvaluation();
+        });
+    </script>
+</body>
+
+</html>
