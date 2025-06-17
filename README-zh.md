@@ -4,6 +4,12 @@
 
 一个基于多智能体系统的头脑风暴工具，让AI代理帮助您进行创意思考和想法拓展。
 
+## 🚀 快速开始
+
+**立即试用：** [https://lum1104.github.io/agent-brainstorm/](https://lum1104.github.io/agent-brainstorm/)
+
+无需安装！只需打开链接，输入您的 Google Gemini API 密钥，即可开始头脑风暴。
+
 ## ✨ 项目简介
 
 Agent Brainstorm 是一个完全运行在客户端的多智能体头脑风暴系统。您只需输入一个简单的想法或主题，系统会自动组建专家团队，通过结构化的五阶段流程帮助您生成创新想法并制定实施计划。

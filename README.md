@@ -4,6 +4,12 @@
 
 A multi-agent brainstorming tool powered by AI agents to help you with creative thinking and idea expansion.
 
+## 🚀 Quick Start
+
+**Try it now:** [https://lum1104.github.io/agent-brainstorm/](https://lum1104.github.io/agent-brainstorm/)
+
+No installation required! Just open the link, enter your Google Gemini API key, and start brainstorming.
+
 ## ✨ Project Overview
 
 Agent Brainstorm is a fully client-side multi-agent brainstorming system. Simply enter a brief idea or topic, and the system will automatically assemble an expert team to help you generate innovative ideas and create implementation plans through a structured five-stage process.
