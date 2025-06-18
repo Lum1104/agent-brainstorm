@@ -98,11 +98,8 @@
             padding: 1rem;
             background-color: #f9fafb;
             overflow: auto;
-            /* Make it scrollable if content overflows */
             max-height: 40vh;
-            /* Limit height to roughly 1/3 of viewport */
             resize: vertical;
-            /* Allow user to resize vertically */
         }
 
         #chart-container .mermaid {
@@ -114,43 +111,32 @@
 
         #chart-container .mermaid svg {
             max-width: none;
-            /* Allow SVG to exceed container for zooming */
             height: auto;
             transition: transform 0.2s ease-in-out;
         }
 
-        /* Fullscreen Modal Styles */
-        #fullscreen-modal {
+        /* Modal Styles */
+        .modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.85);
-            /* display: flex; /* REMOVED to prevent override */
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            padding: 2rem;
-            box-sizing: border-box;
-        }
-
-        #fullscreen-modal-content {
-            width: 100%;
-            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
             display: flex;
             justify-content: center;
             align-items: center;
+            z-index: 1000;
+            padding: 1rem;
         }
 
-        #close-fullscreen {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            font-size: 2.5rem;
-            color: white;
-            cursor: pointer;
-            line-height: 1;
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 100%;
+            max-width: 40rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
         }
     </style>
 </head>
@@ -194,8 +180,8 @@
                         Type:</label>
                     <select id="brainstorm-type"
                         class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
-                        <option value="project">Project Idea (for products, features, etc.)</option>
                         <option value="research_paper">Research Paper (for academic topics, studies, etc.)</option>
+                        <option value="project">Project Idea (for products, features, etc.)</option>
                     </select>
                 </div>
                 <div class="mb-4">
@@ -275,23 +261,31 @@
                 <p class="mt-2 text-gray-600">Expert agent is drafting the document and flowchart...</p>
             </div>
             <div id="planning-container" class="prose max-w-none mt-6"></div>
+            <div id="share-export-container"
+                class="hidden mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row gap-4 justify-center">
+                <button id="export-md-btn"
+                    class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition-all duration-200">
+                    Export to .md
+                </button>
+            </div>
         </div>
     </div>
 
-    <div id="fullscreen-modal" class="hidden">
-        <span id="close-fullscreen">&times;</span>
-        <div id="fullscreen-modal-content">
-        </div>
+    <!-- Modals -->
+    <div id="fullscreen-modal" class="hidden modal">
+        <span id="close-fullscreen" class="absolute top-5 right-8 text-4xl text-white cursor-pointer">&times;</span>
+        <div id="fullscreen-modal-content" class="w-full h-full flex justify-center items-center"></div>
     </div>
-
 
     <script type="module">
         // --- CONFIGURATION & STATE ---
         let userApiKey = null;
         let brainstormType = 'project';
-        let allParsedIdeas = []; // Holds { role, idea, id } for filtering
+        let allParsedIdeas = [];
         let chartZoomLevel = 1.0;
-        let pdfTextContext = ''; // Holds extracted text from the uploaded PDF
+        let pdfTextContext = '';
+        let brainstormState = {}; // Central state object for sharing
+
         mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
         // --- PROMPT TEMPLATES ---
@@ -347,7 +341,8 @@
         const fullscreenModal = document.getElementById('fullscreen-modal');
         const fullscreenModalContent = document.getElementById('fullscreen-modal-content');
         const closeFullscreenBtn = document.getElementById('close-fullscreen');
-
+        const shareExportContainer = document.getElementById('share-export-container');
+        const exportMdBtn = document.getElementById('export-md-btn');
 
         // --- GEMINI API HELPER ---
         async function callGemini(contents, generationConfig = {}) {
@@ -411,10 +406,23 @@
             return temp.innerHTML;
         }
 
+
+        window.addEventListener('load', () => {
+            const storedApiKey = sessionStorage.getItem('gemini-api-key');
+            if (storedApiKey) {
+                userApiKey = storedApiKey;
+                keyStatus.textContent = "API Key restored from session.";
+                keyStatus.classList.remove('hidden');
+                startBtn.disabled = false;
+                setTimeout(() => keyStatus.classList.add('hidden'), 3000);
+            }
+        });
+
         saveKeyBtn.addEventListener('click', () => {
             const key = apiKeyInput.value.trim();
             if (key) {
                 userApiKey = key;
+                sessionStorage.setItem('gemini-api-key', key); // Save key to session storage
                 keyStatus.textContent = "API Key has been set for this session.";
                 keyStatus.classList.remove('hidden');
                 apiKeyInput.value = '';
@@ -426,7 +434,6 @@
             }
         });
 
-        // PDF Handling Logic
         pdfUploadInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file || file.type !== 'application/pdf') {
@@ -436,7 +443,7 @@
             }
 
             pdfStatus.textContent = `Processing "${file.name}"...`;
-            pdfTextContext = ''; // Reset context
+            pdfTextContext = '';
 
             try {
                 const reader = new FileReader();
@@ -476,19 +483,26 @@
             brainstormType = brainstormTypeInput.value;
 
             // --- Reset UI for a new run ---
-            [stageRagContainer, stage2Container, stage3Container, stage5Container].forEach(el => el.classList.add('hidden'));
+            [stageRagContainer, stage2Container, stage3Container, stage5Container, shareExportContainer].forEach(el => el.classList.add('hidden'));
             [personaContainer, ragSummaryContainer, ideasContainer, evaluationContainer, topIdeasContainer, planningContainer].forEach(el => el.innerHTML = '');
             toConvergentBtn.classList.add('hidden');
             allParsedIdeas = [];
             startBtn.disabled = true;
 
-            // This now runs the RAG agent first to provide context for persona generation
-            // It will combine the web search with the PDF context
+            // Initialize state object for this run
+            brainstormState = {
+                topic: topic,
+                type: brainstormType,
+                pdfStatus: pdfStatus.textContent
+            };
+
             const combinedContext = await runRagAndCombineContext(topic, pdfTextContext);
+            brainstormState.combinedContext = combinedContext;
 
             if (combinedContext && combinedContext !== "Could not generate context.") {
                 const personas = await runPreviewAgent(topic, combinedContext);
                 if (personas && personas.length > 0) {
+                    brainstormState.personas = personas;
                     await runDivergentIdeation(topic, personas, combinedContext);
                 }
             }
@@ -510,13 +524,8 @@
                 const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }], { responseMimeType: "application/json", responseSchema: schema });
                 const personaData = JSON.parse(response.candidates[0].content.parts[0].text);
                 hideLoader(previewAgentLoader);
-                stage2Container.classList.remove('hidden'); // Show next stage directly
-                personaData.personas.forEach(p => {
-                    const card = document.createElement('div');
-                    card.className = 'agent-card bg-white p-4 rounded-lg border';
-                    card.innerHTML = `<h3 class="font-bold text-blue-600">${sanitizeHTML(p.role)}</h3><p class="text-sm text-gray-500 mt-1"><strong>Goal:</strong> ${sanitizeHTML(p.goal)}</p><p class="text-sm text-gray-500 mt-1"><strong>Backstory:</strong> ${sanitizeHTML(p.backstory)}</p>`;
-                    personaContainer.appendChild(card);
-                });
+                stage2Container.classList.remove('hidden');
+                personaData.personas.forEach(p => renderPersonaCard(p));
                 return personaData.personas;
             } catch (error) {
                 hideLoader(previewAgentLoader);
@@ -525,6 +534,12 @@
             }
         }
 
+        function renderPersonaCard(persona) {
+            const card = document.createElement('div');
+            card.className = 'agent-card bg-white p-4 rounded-lg border';
+            card.innerHTML = `<h3 class="font-bold text-blue-600">${sanitizeHTML(persona.role)}</h3><p class="text-sm text-gray-500 mt-1"><strong>Goal:</strong> ${sanitizeHTML(persona.goal)}</p><p class="text-sm text-gray-500 mt-1"><strong>Backstory:</strong> ${sanitizeHTML(persona.backstory)}</p>`;
+            personaContainer.appendChild(card);
+        }
 
         async function duckDuckGoSearch(query) {
             const proxyUrls = [
@@ -577,18 +592,15 @@
 
             try {
                 const searchResults = await duckDuckGoSearch(topic);
-
                 ragLoaderText.textContent = 'Web search complete. Summarizing results...';
-
                 const summarizerPromptText = prompts.rag_summary.replace('{search_results}', searchResults);
                 const response = await callGemini([{ role: "user", parts: [{ text: summarizerPromptText }] }]);
                 const webSummaryText = response.candidates[0].content.parts[0].text;
 
-                // Combine PDF context with web summary
                 let combinedContext = `**Web Search Summary:**\n${webSummaryText}`;
                 if (pdfContent) {
                     const pdfSummaryPrompt = prompts.pdf.replace('{pdf_content}', pdfContent);
-                    const pdf_response = await callGemini([{ role: "user", parts: [{ text: pdfContent }] }]);
+                    const pdf_response = await callGemini([{ role: "user", parts: [{ text: pdfSummaryPrompt }] }]);
                     const pdfSummaryText = pdf_response.candidates[0].content.parts[0].text;
                     combinedContext += `\n\n---\n\n**Uploaded Document Context:**\n${pdfSummaryText}`;
                 }
@@ -612,6 +624,7 @@
             allParsedIdeas = [];
             const RATE_LIMIT_DELAY = 1000;
             let ideaCounter = 0;
+            brainstormState.ideationOutputs = {}; // Store raw outputs
 
             for (const persona of personas) {
                 const prompt = prompts.ideation[brainstormType]
@@ -624,81 +637,9 @@
                 try {
                     const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
                     const ideasText = response.candidates[0].content.parts[0].text;
-
-                    const personaIdeasContainer = document.createElement('div');
-                    personaIdeasContainer.className = 'agent-card bg-white p-4 rounded-lg border';
-                    personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3>`;
-
-                    // A more robust regex to find each complete idea block
-                    const ideaBlockRegex = /- \*\*(Idea|Research Question):\*\*([\s\S]*?)(?=- \*\*(Idea|Research Question):\*\*|$)/g;
-                    const matches = [...ideasText.matchAll(ideaBlockRegex)];
-
-
-                    for (const match of matches) {
-                        const block = match[0]; // The full text of one idea block
-
-                        // Use specific regexes to pull data from the block
-                        const ideaTitleMatch = block.match(/- \*\*(?:Idea|Research Question):\*\*\s*(.*?)\n/);
-                        const targetAudienceMatch = block.match(/- \*\*Target Audience:\*\*\s*(.*?)\n/);
-                        const problemSolvedMatch = block.match(/- \*\*Problem Solved:\*\*\s*(.*?)\n/);
-                        const rationaleMatch = block.match(/- \*\*My Rationale:\*\*\s*(.*)/s); // Use 's' flag for multiline
-                        // Fields for research paper
-                        const methodologyMatch = block.match(/- \*\*Potential Methodology:\*\*\s*(.*?)\n/);
-                        const contributionMatch = block.match(/- \*\*Potential Contribution:\*\*\s*(.*?)\n/);
-
-                        let ideaData = {};
-                        let isValid = false;
-
-                        if (brainstormType === 'project' && ideaTitleMatch && targetAudienceMatch && problemSolvedMatch && rationaleMatch) {
-                            ideaData = {
-                                title: ideaTitleMatch[1].trim(),
-                                targetAudience: targetAudienceMatch[1].trim(),
-                                problemSolved: problemSolvedMatch[1].trim(),
-                                rationale: rationaleMatch[1].trim()
-                            };
-                            isValid = true;
-                        } else if (brainstormType === 'research_paper' && ideaTitleMatch && methodologyMatch && contributionMatch && rationaleMatch) {
-                            ideaData = {
-                                title: ideaTitleMatch[1].trim(),
-                                potentialMethodology: methodologyMatch[1].trim(),
-                                potentialContribution: contributionMatch[1].trim(),
-                                rationale: rationaleMatch[1].trim()
-                            };
-                            isValid = true;
-                        }
-
-                        if (isValid) {
-                            const ideaId = `idea-${ideaCounter++}`;
-                            allParsedIdeas.push({ role: persona.role, idea: ideaData, id: ideaId });
-
-                            const checkboxContainer = document.createElement('div');
-                            checkboxContainer.className = 'flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 border-b';
-                            const ideaDataString = JSON.stringify(ideaData);
-
-                            // Build the display HTML dynamically based on type
-                            let displayHTML = `<label for="${ideaId}" class="font-semibold text-gray-800">${sanitizeHTML(ideaData.title)}</label><div class="text-sm text-gray-600 pl-2">`;
-                            if (brainstormType === 'project') {
-                                displayHTML += `
-                                    <p class="mt-1"><strong class="text-gray-700">For:</strong> ${sanitizeHTML(ideaData.targetAudience)}</p>
-                                    <p class="mt-1"><strong class="text-gray-700">Problem:</strong> ${sanitizeHTML(ideaData.problemSolved)}</p>`;
-                            } else {
-                                displayHTML += `
-                                    <p class="mt-1"><strong class="text-gray-700">Methodology:</strong> ${sanitizeHTML(ideaData.potentialMethodology)}</p>
-                                    <p class="mt-1"><strong class="text-gray-700">Contribution:</strong> ${sanitizeHTML(ideaData.potentialContribution)}</p>`;
-                            }
-                            displayHTML += `<p class="mt-1"><strong class="text-gray-700">Rationale:</strong> <em class="text-gray-500">${sanitizeHTML(ideaData.rationale)}</em></p></div>`;
-
-                            checkboxContainer.innerHTML = `
-                                <input type="checkbox" id="${ideaId}" data-role="${sanitizeHTML(persona.role)}" data-idea='${sanitizeHTML(ideaDataString)}' checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shrink-0">
-                                <div>${displayHTML}</div>
-                            `;
-                            personaIdeasContainer.appendChild(checkboxContainer);
-                        } else {
-                            // --- DEBUGGING LOG ---
-                            console.warn(`[${persona.role}] Failed to validate block. Content:`, block);
-                        }
-                    }
-                    ideasContainer.appendChild(personaIdeasContainer);
+                    brainstormState.ideationOutputs[persona.role] = ideasText; // Save for restoration
+                    renderIdeationBlock(persona, ideasText, ideaCounter);
+                    ideaCounter += 5; // approx
 
                 } catch (error) {
                     console.error("Error in runDivergentIdeation for persona " + persona.role, error);
@@ -716,36 +657,90 @@
             }
         }
 
-        toConvergentBtn.addEventListener('click', () => {
-            // Get the IDs of the checked checkboxes
-            const selectedIdeaIds =
-                Array.from(ideasContainer.querySelectorAll('input[type="checkbox"]:checked'))
-                    .map(cb => cb.id);
+        function renderIdeationBlock(persona, ideasText, ideaCounterStart) {
+            let ideaCounter = ideaCounterStart;
+            const personaIdeasContainer = document.createElement('div');
+            personaIdeasContainer.className = 'agent-card bg-white p-4 rounded-lg border';
+            personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3>`;
 
+            const ideaBlockRegex = /- \*\*(Idea|Research Question):\*\*([\s\S]*?)(?=- \*\*(Idea|Research Question):\*\*|$)/g;
+            const matches = [...ideasText.matchAll(ideaBlockRegex)];
+
+            if (matches.length === 0) {
+                personaIdeasContainer.innerHTML += `<p class="text-gray-500 italic">This agent did not generate any ideas in the correct format.</p>`;
+            }
+
+            for (const match of matches) {
+                const block = match[0];
+                // Match title which is mandatory
+                const ideaTitleMatch = block.match(/- \*\*(?:Idea|Research Question):\*\*\s*(.*?)(?:\n|$)/);
+
+                if (!ideaTitleMatch || !ideaTitleMatch[1].trim()) {
+                    console.warn(`[${persona.role}] Skipped block due to missing title. Content:`, block);
+                    continue; // Skip this block if it doesn't even have a title
+                }
+                const title = ideaTitleMatch[1].trim();
+
+                let ideaData = { title: title };
+
+                // Optional fields, grab them if they exist. Use N/A if not found.
+                const rationaleMatch = block.match(/- \*\*My Rationale:\*\*\s*(.*)/s);
+                ideaData.rationale = rationaleMatch ? rationaleMatch[1].trim() : 'N/A';
+
+                if (brainstormType === 'project') {
+                    const targetAudienceMatch = block.match(/- \*\*Target Audience:\*\*\s*(.*?)(?:\n|$)/);
+                    const problemSolvedMatch = block.match(/- \*\*Problem Solved:\*\*\s*(.*?)(?:\n|$)/);
+                    ideaData.targetAudience = targetAudienceMatch ? targetAudienceMatch[1].trim() : 'N/A';
+                    ideaData.problemSolved = problemSolvedMatch ? problemSolvedMatch[1].trim() : 'N/A';
+                } else { // research_paper
+                    const methodologyMatch = block.match(/- \*\*Potential Methodology:\*\*\s*(.*?)(?:\n|$)/);
+                    const contributionMatch = block.match(/- \*\*Potential Contribution:\*\*\s*(.*?)(?:\n|$)/);
+                    ideaData.potentialMethodology = methodologyMatch ? methodologyMatch[1].trim() : 'N/A';
+                    ideaData.potentialContribution = contributionMatch ? contributionMatch[1].trim() : 'N/A';
+                }
+
+                const ideaId = `idea-${ideaCounter++}`;
+                allParsedIdeas.push({ role: persona.role, idea: ideaData, id: ideaId });
+
+                const checkboxContainer = document.createElement('div');
+                checkboxContainer.className = 'flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 border-b';
+                const ideaDataString = JSON.stringify(ideaData);
+
+                let displayHTML = `<label for="${ideaId}" class="font-semibold text-gray-800">${sanitizeHTML(ideaData.title)}</label><div class="text-sm text-gray-600 pl-2">`;
+                if (brainstormType === 'project') {
+                    displayHTML += `<p class="mt-1"><strong class="text-gray-700">For:</strong> ${sanitizeHTML(ideaData.targetAudience)}</p><p class="mt-1"><strong class="text-gray-700">Problem:</strong> ${sanitizeHTML(ideaData.problemSolved)}</p>`;
+                } else {
+                    displayHTML += `<p class="mt-1"><strong class="text-gray-700">Methodology:</strong> ${sanitizeHTML(ideaData.potentialMethodology)}</p><p class="mt-1"><strong class="text-gray-700">Contribution:</strong> ${sanitizeHTML(ideaData.potentialContribution)}</p>`;
+                }
+                displayHTML += `<p class="mt-1"><strong class="text-gray-700">Rationale:</strong> <em class="text-gray-500">${sanitizeHTML(ideaData.rationale)}</em></p></div>`;
+
+                checkboxContainer.innerHTML = `<input type="checkbox" id="${ideaId}" data-idea='${sanitizeHTML(ideaDataString)}' checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shrink-0"><div>${displayHTML}</div>`;
+                personaIdeasContainer.appendChild(checkboxContainer);
+            }
+            ideasContainer.appendChild(personaIdeasContainer);
+        }
+
+        toConvergentBtn.addEventListener('click', () => {
+            const selectedIdeaIds = Array.from(ideasContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.id);
             if (selectedIdeaIds.length === 0) {
                 alert("Please select at least one idea to proceed.");
                 return;
             }
 
-            // Find the full idea objects from the global array using the selected IDs
+            brainstormState.selectedIdeaIds = selectedIdeaIds; // Save for restoration
+
             const selectedIdeas = allParsedIdeas.filter(parsedIdea => selectedIdeaIds.includes(parsedIdea.id));
-
-            // Format the selected ideas into a high-quality string for the next agent
             const rawIdeasString = selectedIdeas.map(item => {
-                const ideaObj = item.idea; // The idea is already a parsed object
+                const ideaObj = item.idea;
                 let summary = `- (From ${item.role}) **${ideaObj.title}**\n`;
-
                 if (brainstormType === 'project') {
-                    summary += `  - **For:** ${ideaObj.targetAudience}\n`;
-                    summary += `  - **Problem:** ${ideaObj.problemSolved}\n`;
-                } else { // research_paper
-                    summary += `  - **Methodology:** ${ideaObj.potentialMethodology}\n`;
-                    summary += `  - **Contribution:** ${ideaObj.potentialContribution}\n`;
+                    summary += `  - **For:** ${ideaObj.targetAudience}\n  - **Problem:** ${ideaObj.problemSolved}\n`;
+                } else {
+                    summary += `  - **Methodology:** ${ideaObj.potentialMethodology}\n  - **Contribution:** ${ideaObj.potentialContribution}\n`;
                 }
                 summary += `  - **Rationale:** ${ideaObj.rationale}`;
                 return summary;
             }).join('\n\n---\n\n');
-
 
             stage3Container.classList.remove('hidden');
             window.scrollTo({ top: stage3Container.offsetTop, behavior: 'smooth' });
@@ -757,46 +752,15 @@
             showLoader(convergentLoader);
             evaluationContainer.innerHTML = '';
             topIdeasContainer.innerHTML = '';
-
-            // console.log("Running convergent evaluation with ideas:", rawIdeasString);
+            brainstormState.rawIdeasForEvaluation = rawIdeasString; // Save for restoration
 
             const prompt = prompts.evaluation[brainstormType].replace('{raw_ideas}', rawIdeasString);
 
             try {
                 const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
                 const evaluationText = response.candidates[0].content.parts[0].text;
-                const jsonMatch = evaluationText.match(/```json\s*([\s\S]*?)\s*```/);
-                let topIdeas = [];
-                let evaluationMarkdown = evaluationText;
-
-                if (jsonMatch && jsonMatch[1]) {
-                    try {
-                        topIdeas = JSON.parse(jsonMatch[1]);
-                        evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').trim();
-                    } catch (e) {
-                        console.error("Failed to parse top ideas JSON:", e);
-                    }
-                }
-
-                evaluationContainer.innerHTML = marked.parse(evaluationMarkdown);
-
-                if (topIdeas.length > 0) {
-                    const header = document.createElement('h3');
-                    header.className = 'text-xl font-semibold text-gray-700 stage-title';
-                    header.textContent = 'Select a Top Idea to Plan';
-                    topIdeasContainer.appendChild(header);
-                    const listContainer = document.createElement('div');
-                    listContainer.className = 'flex flex-col sm:flex-row gap-4 mt-4';
-                    topIdeas.forEach(idea => {
-                        const planBtn = document.createElement('button');
-                        planBtn.className = 'bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all duration-200 text-left';
-                        planBtn.innerHTML = `<span class="font-bold">Plan:</span> ${sanitizeHTML(idea.title)}`;
-                        planBtn.onclick = () => runImplementationPlanning(idea);
-                        listContainer.appendChild(planBtn);
-                    });
-                    topIdeasContainer.appendChild(listContainer);
-                }
-
+                brainstormState.evaluationOutput = evaluationText; // Save for restoration
+                renderConvergentEvaluation(evaluationText);
             } catch (error) {
                 evaluationContainer.innerHTML = `<p class="text-red-500">Error during evaluation: ${error.message}</p>`;
             } finally {
@@ -804,15 +768,47 @@
             }
         }
 
+        function renderConvergentEvaluation(evaluationText) {
+            const jsonMatch = evaluationText.match(/```json\s*([\s\S]*?)\s*```/);
+            let topIdeas = [];
+            let evaluationMarkdown = evaluationText;
+
+            if (jsonMatch && jsonMatch[1]) {
+                try {
+                    topIdeas = JSON.parse(jsonMatch[1]);
+                    evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').trim();
+                } catch (e) {
+                    console.error("Failed to parse top ideas JSON:", e);
+                }
+            }
+            evaluationContainer.innerHTML = marked.parse(evaluationMarkdown);
+
+            if (topIdeas.length > 0) {
+                const header = document.createElement('h3');
+                header.className = 'text-xl font-semibold text-gray-700 stage-title';
+                header.textContent = 'Select a Top Idea to Plan';
+                topIdeasContainer.appendChild(header);
+                const listContainer = document.createElement('div');
+                listContainer.className = 'flex flex-col sm:flex-row gap-4 mt-4';
+                topIdeas.forEach(idea => {
+                    const planBtn = document.createElement('button');
+                    planBtn.className = 'bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all duration-200 text-left';
+                    planBtn.innerHTML = `<span class="font-bold">Plan:</span> ${sanitizeHTML(idea.title)}`;
+                    planBtn.onclick = () => runImplementationPlanning(idea);
+                    listContainer.appendChild(planBtn);
+                });
+                topIdeasContainer.appendChild(listContainer);
+            }
+        }
+
         async function runImplementationPlanning(idea) {
             stage5Container.classList.remove('hidden');
             stage5Subtitle.textContent = `The AI expert has generated a high-level ${brainstormType === 'project' ? 'implementation plan' : 'research outline'} for the selected idea.`;
-
             window.scrollTo({ top: stage5Container.offsetTop, behavior: 'smooth' });
             showLoader(planningLoader);
             planningContainer.innerHTML = '';
-            chartZoomLevel = 1.0; // Reset zoom level for new chart
 
+            brainstormState.finalSelectedIdea = idea; // Save for restoration
             const prompt = prompts.planning[brainstormType]
                 .replace('{title}', sanitizeHTML(idea.title))
                 .replace('{description}', sanitizeHTML(idea.description));
@@ -820,81 +816,10 @@
             try {
                 const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
                 let planText = response.candidates[0].content.parts[0].text;
-
-                const mermaidRegex = /```mermaid\s*([\s\S]*?)```/;
-                const mermaidMatch = planText.match(mermaidRegex);
-
-                const markdownContent = planText.replace(mermaidRegex, '').replace(/^```markdown\s*|```\s*$/g, '').trim();
-                planningContainer.innerHTML = marked.parse(markdownContent);
-
-                if (mermaidMatch && mermaidMatch[1]) {
-                    const mermaidCode = mermaidMatch[1].trim();
-
-                    const chartWrapper = document.createElement('div');
-                    chartWrapper.className = 'mt-6';
-
-                    const controlsHTML = `
-                        <div id="chart-controls">
-                            <button id="zoom-in-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom In</button>
-                            <button id="zoom-out-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom Out</button>
-                            <button id="reset-zoom-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Reset</button>
-                            <button id="fullscreen-btn" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg ml-auto">Fullscreen</button>
-                        </div>
-                    `;
-                    chartWrapper.innerHTML = controlsHTML;
-
-                    const chartContainer = document.createElement('div');
-                    chartContainer.id = 'chart-container';
-                    const mermaidDiv = document.createElement('div');
-                    mermaidDiv.className = 'mermaid';
-                    chartContainer.appendChild(mermaidDiv);
-                    chartWrapper.appendChild(chartContainer);
-                    planningContainer.appendChild(chartWrapper);
-
-                    try {
-                        const { svg } = await mermaid.render(`mermaid-diag-${Date.now()}`, mermaidCode);
-                        mermaidDiv.innerHTML = svg;
-                        const svgElement = mermaidDiv.querySelector('svg');
-
-                        // Attach event listeners to controls
-                        const zoomInBtn = chartWrapper.querySelector('#zoom-in-btn');
-                        const zoomOutBtn = chartWrapper.querySelector('#zoom-out-btn');
-                        const resetZoomBtn = chartWrapper.querySelector('#reset-zoom-btn');
-                        const fullscreenBtn = chartWrapper.querySelector('#fullscreen-btn');
-
-                        const updateZoom = () => {
-                            svgElement.style.transform = `scale(${chartZoomLevel})`;
-                        };
-
-                        zoomInBtn.onclick = () => {
-                            chartZoomLevel += 0.1;
-                            updateZoom();
-                        };
-                        zoomOutBtn.onclick = () => {
-                            chartZoomLevel = Math.max(0.1, chartZoomLevel - 0.1);
-                            updateZoom();
-                        };
-                        resetZoomBtn.onclick = () => {
-                            chartZoomLevel = 1.0;
-                            updateZoom();
-                        };
-                        fullscreenBtn.onclick = () => {
-                            fullscreenModalContent.innerHTML = ''; // Clear previous
-                            const clonedSvg = svgElement.cloneNode(true);
-                            clonedSvg.style.transform = ''; // Reset transform for modal
-                            clonedSvg.style.maxWidth = '95vw';
-                            clonedSvg.style.maxHeight = '95vh';
-                            fullscreenModalContent.appendChild(clonedSvg);
-                            fullscreenModal.classList.remove('hidden');
-                            fullscreenModal.classList.add('flex'); // Make it a flex container
-                            document.body.style.overflow = 'hidden'; // Prevent background scroll
-                        };
-
-                    } catch (e) {
-                        console.error("Mermaid rendering failed:", e);
-                        mermaidDiv.innerHTML = `<p class="text-red-500 font-bold">Mermaid Chart Error:</p><pre class="text-sm text-red-500 bg-red-50 p-2 rounded">${e.message}</pre><p class="mt-2 font-bold">Chart Code:</p><pre class="text-sm bg-gray-100 p-2 rounded">${sanitizeHTML(mermaidCode)}</pre>`;
-                    }
-                }
+                brainstormState.finalPlanOutput = planText; // Save for restoration
+                renderImplementationPlan(planText);
+                shareExportContainer.classList.remove('hidden');
+                shareExportContainer.classList.add('flex');
             } catch (error) {
                 planningContainer.innerHTML = `<p class="text-red-500">Error generating the final document: ${error.message}</p>`;
             } finally {
@@ -902,10 +827,115 @@
             }
         }
 
+        async function renderImplementationPlan(planText) {
+            planningContainer.innerHTML = '';
+            chartZoomLevel = 1.0;
+            const mermaidRegex = /```mermaid\s*([\s\S]*?)```/;
+            const mermaidMatch = planText.match(mermaidRegex);
+            const markdownContent = planText.replace(mermaidRegex, '').replace(/^```markdown\s*|```\s*$/g, '').trim();
+            planningContainer.innerHTML = marked.parse(markdownContent);
+
+            if (mermaidMatch && mermaidMatch[1]) {
+                const mermaidCode = mermaidMatch[1].trim();
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = 'mt-6';
+                chartWrapper.innerHTML = `
+                    <div id="chart-controls">
+                        <button id="zoom-in-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom In</button>
+                        <button id="zoom-out-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom Out</button>
+                        <button id="reset-zoom-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Reset</button>
+                        <button id="fullscreen-btn" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg ml-auto">Fullscreen</button>
+                    </div>`;
+                const chartContainer = document.createElement('div');
+                chartContainer.id = 'chart-container';
+                const mermaidDiv = document.createElement('div');
+                mermaidDiv.className = 'mermaid';
+                chartContainer.appendChild(mermaidDiv);
+                chartWrapper.appendChild(chartContainer);
+                planningContainer.appendChild(chartWrapper);
+
+                try {
+                    const { svg } = await mermaid.render(`mermaid-diag-${Date.now()}`, mermaidCode);
+                    mermaidDiv.innerHTML = svg;
+                    const svgElement = mermaidDiv.querySelector('svg');
+
+                    const updateZoom = () => { svgElement.style.transform = `scale(${chartZoomLevel})`; };
+                    chartWrapper.querySelector('#zoom-in-btn').onclick = () => { chartZoomLevel += 0.1; updateZoom(); };
+                    chartWrapper.querySelector('#zoom-out-btn').onclick = () => { chartZoomLevel = Math.max(0.1, chartZoomLevel - 0.1); updateZoom(); };
+                    chartWrapper.querySelector('#reset-zoom-btn').onclick = () => { chartZoomLevel = 1.0; updateZoom(); };
+                    chartWrapper.querySelector('#fullscreen-btn').onclick = () => {
+                        fullscreenModalContent.innerHTML = '';
+                        const clonedSvg = svgElement.cloneNode(true);
+                        clonedSvg.style.transform = '';
+                        clonedSvg.style.maxWidth = '95vw';
+                        clonedSvg.style.maxHeight = '95vh';
+                        fullscreenModalContent.appendChild(clonedSvg);
+                        fullscreenModal.classList.remove('hidden');
+                        document.body.style.overflow = 'hidden';
+                    };
+                } catch (e) {
+                    mermaidDiv.innerHTML = `<p class="text-red-500 font-bold">Mermaid Chart Error:</p><pre>${e.message}</pre><pre>${sanitizeHTML(mermaidCode)}</pre>`;
+                }
+            }
+        }
+
+        exportMdBtn.addEventListener('click', () => {
+            const markdownContent = generateMarkdownExport();
+            downloadMarkdown('brainstorm-export.md', markdownContent);
+        });
+
+        function generateMarkdownExport() {
+            const md = [];
+            md.push(`# Brainstorm Session: ${brainstormState.topic}`);
+            md.push(`**Type:** ${brainstormState.type}`);
+
+            if (brainstormState.combinedContext) {
+                md.push('\n## Stage 1: Context & Team');
+                md.push('### Research Context');
+                md.push(brainstormState.combinedContext);
+            }
+            if (brainstormState.personas) {
+                md.push('\n### Assembled Agent Team');
+                brainstormState.personas.forEach(p => {
+                    md.push(`- **${p.role}**`);
+                    md.push(`  - **Goal:** ${p.goal}`);
+                    md.push(`  - **Backstory:** ${p.backstory}`);
+                });
+            }
+            if (brainstormState.ideationOutputs) {
+                md.push('\n## Stage 2: Divergent Ideation');
+                for (const role in brainstormState.ideationOutputs) {
+                    md.push(`\n### Ideas from ${role}`);
+                    md.push(brainstormState.ideationOutputs[role]);
+                }
+            }
+            if (brainstormState.evaluationOutput) {
+                md.push('\n## Stage 3 & 4: Convergent Evaluation');
+                // Remove the JSON block from the evaluation for a cleaner md export
+                const cleanEvaluation = brainstormState.evaluationOutput.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
+                md.push(cleanEvaluation);
+            }
+            if (brainstormState.finalPlanOutput) {
+                md.push('\n## Stage 5: Final Plan');
+                md.push(brainstormState.finalPlanOutput);
+            }
+
+            return md.join('\n\n');
+        }
+
+        function downloadMarkdown(filename, text) {
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
         // Fullscreen modal close logic
         closeFullscreenBtn.addEventListener('click', () => {
             fullscreenModal.classList.add('hidden');
-            fullscreenModal.classList.remove('flex'); // Remove flex display
             fullscreenModalContent.innerHTML = '';
             document.body.style.overflow = 'auto';
         });
