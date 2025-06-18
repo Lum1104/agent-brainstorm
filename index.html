@@ -8,9 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <p class="text-sm text-gray-600 mt-1">By Yuxiang | <a href="mailto:yuxiang.lin@gatech.edu"
-            class="text-blue-500 hover:underline">yuxiang.lin@gatech.edu</a></p>
-    <p class="text-xs text-gray-500 mt-1">Feel free to contact for any advice.</p>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -47,6 +45,7 @@
             }
         }
 
+        /* Prose styles for rendered markdown */
         .prose h1,
         .prose h2,
         .prose h3 {
@@ -72,6 +71,83 @@
         .prose th {
             background-color: #f9fafb;
         }
+
+        .prose pre {
+            background-color: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Styles for Mermaid Chart and Controls */
+        #chart-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            align-items: center;
+        }
+
+        #chart-container {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background-color: #f9fafb;
+            overflow: auto;
+            /* Make it scrollable if content overflows */
+            max-height: 40vh;
+            /* Limit height to roughly 1/3 of viewport */
+            resize: vertical;
+            /* Allow user to resize vertically */
+        }
+
+        #chart-container .mermaid {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100%;
+        }
+
+        #chart-container .mermaid svg {
+            max-width: none;
+            /* Allow SVG to exceed container for zooming */
+            height: auto;
+            transition: transform 0.2s ease-in-out;
+        }
+
+        /* Fullscreen Modal Styles */
+        #fullscreen-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            /* display: flex; /* REMOVED to prevent override */
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        #fullscreen-modal-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #close-fullscreen {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 2.5rem;
+            color: white;
+            cursor: pointer;
+            line-height: 1;
+        }
     </style>
 </head>
 
@@ -81,18 +157,18 @@
         <header class="text-center mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Multi-Agent Brainstorming System</h1>
             <p class="mt-2 text-lg text-gray-600">A Client-Side AI Agent System Running in Your Browser</p>
+            <p class="text-sm text-gray-600 mt-1">By Yuxiang | <a href="mailto:yuxiang.lin@gatech.edu"
+                    class="text-blue-500 hover:underline">yuxiang.lin@gatech.edu</a></p>
+            <p class="text-xs text-gray-500 mt-1">Feel free to contact for any advice.</p>
         </header>
 
         <div id="settings-container" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8 rounded-r-lg">
             <h2 class="text-xl font-semibold text-gray-800">Settings</h2>
             <p class="text-gray-700 mt-2 mb-4">Please enter your Google Gemini API Key to use this application. Your key
                 is secure and never leaves your browser.</p>
-
-            <p class="text-gray-700 mt-2 mb-4">
-                You can get your free API Key from <a href="https://aistudio.google.com/apikey" target="_blank"
-                    class="text-yellow-600 font-semibold hover:underline">Google AI Studio</a>.
-            </p>
-
+            <p class="text-gray-700 mt-2 mb-4">You can get your free API Key from <a
+                    href="https://aistudio.google.com/apikey" target="_blank"
+                    class="text-yellow-600 font-semibold hover:underline">Google AI Studio</a>.</p>
             <div class="flex flex-col sm:flex-row gap-2">
                 <input type="password" id="api-key-input" placeholder="Enter your Google API Key"
                     class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none transition">
@@ -103,7 +179,6 @@
             <p id="key-status" class="text-sm mt-2 text-green-700 font-semibold hidden">API Key has been set for this
                 session.</p>
         </div>
-
 
         <div id="stage-1-container" class="bg-white p-6 rounded-xl shadow-md mb-8">
             <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 1: Define Direction & Assemble Team</h2>
@@ -140,15 +215,14 @@
 
         <div id="stage-rag-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
             <h2 class="text-xl font-semibold text-gray-700 stage-title">Context via RAG Agent</h2>
-            <p class="text-gray-600 mb-4">A Research Agent is now searching for information on the topic to provide
-                context for the brainstorming agents.</p>
+            <p class="text-gray-600 mb-4">A Research Agent is now performing a live web search on the topic to provide
+                real-time context for the brainstorming agents.</p>
             <div id="rag-loader" class="flex flex-col items-center mt-6">
                 <div class="loader"></div>
-                <p class="mt-2 text-gray-600">Research Agent is gathering and summarizing information...</p>
+                <p id="rag-loader-text" class="mt-2 text-gray-600">Research Agent is performing a web search...</p>
             </div>
             <div id="rag-summary-container" class="prose max-w-none mt-6 bg-gray-50 p-4 rounded-lg"></div>
         </div>
-
 
         <div id="stage-2-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
             <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 2: Divergent Ideation & Filtering</h2>
@@ -169,8 +243,8 @@
 
         <div id="stage-3-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
             <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 3 & 4: Convergent Evaluation</h2>
-            <p class="text-gray-600 mb-4">A Critic Agent will now analyze, cluster, and evaluate the ideas you
-                selected to identify the most promising concepts.</p>
+            <p class="text-gray-600 mb-4">A Critic Agent will now analyze, cluster, and evaluate the ideas you selected
+                to identify the most promising concepts.</p>
             <div id="convergent-loader" class="flex flex-col items-center mt-6">
                 <div class="loader"></div>
                 <p class="mt-2 text-gray-600">Critic agent is analyzing and ranking ideas...</p>
@@ -185,17 +259,28 @@
                 selected idea.</p>
             <div id="planning-loader" class="flex flex-col items-center mt-6">
                 <div class="loader"></div>
-                <p class="mt-2 text-gray-600">Expert agent is drafting the document...</p>
+                <p class="mt-2 text-gray-600">Expert agent is drafting the document and flowchart...</p>
             </div>
             <div id="planning-container" class="prose max-w-none mt-6"></div>
         </div>
     </div>
+
+    <!-- Fullscreen Modal for Chart -->
+    <div id="fullscreen-modal" class="hidden">
+        <span id="close-fullscreen">&times;</span>
+        <div id="fullscreen-modal-content">
+            <!-- Fullscreen SVG will be injected here -->
+        </div>
+    </div>
+
 
     <script type="module">
         // --- CONFIGURATION & STATE ---
         let userApiKey = null;
         let brainstormType = 'project';
         let allParsedIdeas = []; // Holds { role, idea, id } for filtering
+        let chartZoomLevel = 1.0;
+        mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
         // --- PROMPT TEMPLATES ---
         const prompts = {
@@ -203,7 +288,7 @@
                 project: `You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas (e.g., Product Manager, Lead Engineer, Marketing Head, User Advocate). For each, provide their Role, Goal, and Backstory.\n\nUse this context: {rag_summary}`,
                 research_paper: `You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas (e.g., Lead Researcher, Literature Review Specialist, Methodology Expert). For each, provide their Role, Goal, and Backstory.\n\nUse this context: {rag_summary}`
             },
-            rag: `You are a helpful research assistant. The user wants to brainstorm about '{topic}'. Provide a concise, neutral summary of this topic to provide context for the brainstorming session. Focus on key concepts, definitions, and the current state of the art. Present it as a single, dense paragraph.`,
+            rag_summary: `You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text to be used as context for a brainstorming session. Focus on key concepts, definitions, and the current state of the topic.\nSearch Results:\n---\n{search_results}\n---\n\nProvide your summary in a single, dense paragraph.`,
             ideation: {
                 project: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique persona, brainstorm 5 innovative project ideas or features about '{topic}'. Use this context: {rag_summary}\n\nYour primary goal is quantity and novelty. Do NOT critique your own ideas. Present your ideas as a simple bulleted list in Markdown.`,
                 research_paper: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique scholarly persona, brainstorm 5 innovative research questions, hypotheses, or study designs related to '{topic}'. Use this context: {rag_summary}\n\nYour primary goal is novelty and potential for scholarly contribution. Do NOT critique your ideas yet. Present your ideas as a simple bulleted list in Markdown.`
@@ -213,8 +298,8 @@
                 research_paper: `You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. Group similar concepts into distinct research avenues.\n2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty/Originality (1-10)', 'Methodological Soundness (1-10)', 'Potential Contribution (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 research ideas:'. Then, provide a JSON array of objects for the top 3 research questions you recommend. Each object needs 'title' (a concise research question) and 'description' (a brief explanation of the study). This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`
             },
             planning: {
-                project: `You are an expert AI Project Manager. A promising idea has been selected. Generate a detailed, concise project initiation document in Markdown.\n\n**Selected Idea:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease include these sections:\n### High-Level Requirements & User Stories\n### Proposed Technology Stack\n### Phased Project Timeline (with estimated weeks)\n### Initial Resource Estimation (roles needed)`,
-                research_paper: `You are an experienced academic writer. A promising research idea has been selected. Generate a concise research paper outline or abstract in Markdown.\n\n**Selected Research Question:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease include these sections:\n### 1. Introduction & Problem Statement\n### 2. Preliminary Literature Review\n### 3. Proposed Methodology\n### 4. Expected Outcomes & Contribution to the Field\n### 5. Potential Target Conferences for Publication`
+                project: `You are an expert AI Project Manager. A promising idea has been selected. Generate a detailed, concise project initiation document in Markdown.\n\n**Selected Idea:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease include these sections:\n### High-Level Requirements & User Stories\n### Proposed Technology Stack\n### Phased Project Timeline (with estimated weeks)\n### Initial Resource Estimation (roles needed)\n\nFinally, create a Mermaid flowchart to visualize the project timeline. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. For example:\n\`\`\`mermaid\ngraph TD;\n    A["Phase 1: Discovery & Research (4 weeks)"] --> B["Phase 2: Design & Prototyping (6 weeks)"];\n    B --> C["Phase 3: Development & Testing (8 weeks)"];\n    C --> D["Phase 4: Deployment & Launch (2 weeks)"];\n\`\`\`\n`,
+                research_paper: `You are an experienced academic writer. A promising research idea has been selected. Generate a concise research paper outline or abstract in Markdown.\n\n**Selected Research Question:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease include these sections:\n### 1. Introduction & Problem Statement\n### 2. Preliminary Literature Review\n### 3. Proposed Methodology\n### 4. Expected Outcomes & Contribution to the Field\n### 5. Potential Target Conferences for Publication\n\nFinally, create a Mermaid flowchart to visualize the research stages. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. For example:\n\`\`\`mermaid\ngraph TD;\n    A["Literature Review"] --> B["Formulate Hypothesis"];\n    B --> C["Design Experiment"];\n    C --> D["Collect & Analyze Data"];\n    D --> E["Write Paper"];\n\`\`\`\n`
             }
         };
 
@@ -230,6 +315,7 @@
         const personaContainer = document.getElementById('persona-container');
         const stageRagContainer = document.getElementById('stage-rag-container');
         const ragLoader = document.getElementById('rag-loader');
+        const ragLoaderText = document.getElementById('rag-loader-text');
         const ragSummaryContainer = document.getElementById('rag-summary-container');
         const stage2Container = document.getElementById('stage-2-container');
         const divergentLoader = document.getElementById('divergent-loader');
@@ -243,6 +329,9 @@
         const stage5Subtitle = document.getElementById('stage-5-subtitle');
         const planningLoader = document.getElementById('planning-loader');
         const planningContainer = document.getElementById('planning-container');
+        const fullscreenModal = document.getElementById('fullscreen-modal');
+        const fullscreenModalContent = document.getElementById('fullscreen-modal-content');
+        const closeFullscreenBtn = document.getElementById('close-fullscreen');
 
 
         // --- GEMINI API HELPER ---
@@ -251,12 +340,12 @@
                 alert("Please set your Google API Key in the settings before proceeding.");
                 throw new Error("API Key not set.");
             }
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${userApiKey}`;
             const payload = { contents, generationConfig };
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                     body: JSON.stringify(payload)
                 });
                 if (!response.ok) {
@@ -287,9 +376,13 @@
         }
 
         // --- UI & WORKFLOW LOGIC ---
-        function showLoader(loaderElement) {
+        function showLoader(loaderElement, text = null) {
             loaderElement.classList.remove('hidden');
             loaderElement.classList.add('flex');
+            if (text) {
+                const textElement = loaderElement.querySelector('p');
+                if (textElement) textElement.textContent = text;
+            }
         }
 
         function hideLoader(loaderElement) {
@@ -338,15 +431,18 @@
             allParsedIdeas = [];
             startBtn.disabled = true;
 
-            const personas = await runPreviewAgent(topic, ""); // Initially call without RAG summary
-            if (personas && personas.length > 0) {
-                const ragSummary = await runRagAgent(topic);
-                await runDivergentIdeation(topic, personas, ragSummary);
+            // This now runs the RAG search first to provide context for persona generation
+            const ragSummary = await runRagAgent(topic);
+            if (ragSummary && ragSummary !== "Could not generate a summary.") {
+                const personas = await runPreviewAgent(topic, ragSummary);
+                if (personas && personas.length > 0) {
+                    await runDivergentIdeation(topic, personas, ragSummary);
+                }
             }
             startBtn.disabled = false;
         });
 
-        async function runPreviewAgent(topic) {
+        async function runPreviewAgent(topic, ragSummary) {
             showLoader(previewAgentLoader);
             personaContainer.innerHTML = '';
             const schema = {
@@ -354,12 +450,14 @@
                 properties: { personas: { type: "ARRAY", items: { type: "OBJECT", properties: { role: { "type": "STRING" }, goal: { "type": "STRING" }, backstory: { "type": "STRING" } }, required: ["role", "goal", "backstory"] } } },
                 required: ["personas"]
             };
-            const prompt = prompts.persona[brainstormType].replace('{topic}', sanitizeHTML(topic)).replace('{rag_summary}', 'No summary yet.');
+            const prompt = prompts.persona[brainstormType]
+                .replace('{topic}', sanitizeHTML(topic))
+                .replace('{rag_summary}', ragSummary); // Use the RAG summary
             try {
                 const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }], { responseMimeType: "application/json", responseSchema: schema });
                 const personaData = JSON.parse(response.candidates[0].content.parts[0].text);
                 hideLoader(previewAgentLoader);
-                stageRagContainer.classList.remove('hidden'); // Show next stage
+                stage2Container.classList.remove('hidden'); // Show next stage directly
                 personaData.personas.forEach(p => {
                     const card = document.createElement('div');
                     card.className = 'agent-card bg-white p-4 rounded-lg border';
@@ -374,23 +472,78 @@
             }
         }
 
-        async function runRagAgent(topic) {
-            showLoader(ragLoader);
-            ragSummaryContainer.innerHTML = '';
-            const prompt = prompts.rag.replace('{topic}', sanitizeHTML(topic));
+
+        async function duckDuckGoSearch(query) {
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+
             try {
-                const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
+                const response = await fetch(proxyUrl + searchUrl);
+                if (!response.ok) {
+                    throw new Error(`Network response was not ok: ${response.statusText}`);
+                }
+                const htmlText = await response.text();
+
+                // Use DOMParser to turn the HTML string into a document we can query.
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+
+                // Extract snippets from the search results.
+                const snippets = [];
+                const snippetNodes = doc.querySelectorAll('.result__snippet');
+
+                snippetNodes.forEach(node => {
+                    snippets.push(node.innerText.trim());
+                });
+
+                if (snippets.length === 0) {
+                    return "No search results found from DuckDuckGo. The page structure may have changed or the topic is very obscure.";
+                }
+
+                // Return the snippets joined as a single string.
+                return snippets.join('\n\n');
+            } catch (error) {
+                console.error('DuckDuckGo search failed:', error);
+                return `Failed to retrieve search results. Error: ${error.message}`;
+            }
+        }
+
+
+        async function runRagAgent(topic) {
+            stageRagContainer.classList.remove('hidden');
+            showLoader(ragLoader, 'Research Agent is performing a web search via DuckDuckGo...');
+            ragSummaryContainer.innerHTML = '';
+
+            try {
+                // 1. & 2. Perform web search with our custom DuckDuckGo function.
+                const searchResults = await duckDuckGoSearch(topic);
+
+                if (searchResults.startsWith('Failed') || searchResults.startsWith('No search')) {
+                    throw new Error(searchResults);
+                }
+
+                ragLoaderText.textContent = 'Web search complete. Summarizing results...';
+
+                // 3. Create the prompt for summarization with the retrieved results.
+                const summarizerPromptText = prompts.rag_summary.replace('{search_results}', searchResults);
+
+                // 4. Call Gemini to summarize the search results.
+                const response = await callGemini([{ role: "user", parts: [{ text: summarizerPromptText }] }]);
                 const summaryText = response.candidates[0].content.parts[0].text;
+
+                // 5. Display summary and return it for the next stage.
                 ragSummaryContainer.innerHTML = marked.parse(summaryText);
                 hideLoader(ragLoader);
-                stage2Container.classList.remove('hidden'); // Show next stage
                 return summaryText;
+
             } catch (error) {
+                console.error("Error in runRagAgent:", error);
                 hideLoader(ragLoader);
-                ragSummaryContainer.innerHTML = `<p class="text-red-500">Error generating RAG summary.</p>`;
+                ragSummaryContainer.innerHTML = `<p class="text-red-500">Error during RAG process: ${error.message}</p>`;
                 return "Could not generate a summary.";
             }
         }
+
 
         async function runDivergentIdeation(topic, personas, ragSummary) {
             showLoader(divergentLoader);
@@ -413,7 +566,6 @@
                     const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
                     const ideasText = response.candidates[0].content.parts[0].text;
 
-                    // Parse individual ideas and create checkboxes
                     const personaIdeasContainer = document.createElement('div');
                     personaIdeasContainer.className = 'agent-card bg-white p-4 rounded-lg border';
                     personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3>`;
@@ -427,7 +579,7 @@
                         const checkboxContainer = document.createElement('div');
                         checkboxContainer.className = 'flex items-start gap-2 p-2 rounded-md hover:bg-gray-50';
                         checkboxContainer.innerHTML = `
-                            <input type="checkbox" id="${ideaId}" data-role="${persona.role}" data-idea="${sanitizeHTML(ideaText)}" checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <input type="checkbox" id="${ideaId}" data-role="${sanitizeHTML(persona.role)}" data-idea="${sanitizeHTML(ideaText)}" checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                             <label for="${ideaId}" class="text-gray-700">${sanitizeHTML(ideaText)}</label>
                         `;
                         personaIdeasContainer.appendChild(checkboxContainer);
@@ -465,7 +617,6 @@
                 return;
             }
 
-            // Group ideas by role for the next agent
             const ideasByRole = selectedIdeas.reduce((acc, current) => {
                 acc[current.role] = acc[current.role] || [];
                 acc[current.role].push(`- ${current.idea}`);
@@ -540,6 +691,7 @@
             window.scrollTo({ top: stage5Container.offsetTop, behavior: 'smooth' });
             showLoader(planningLoader);
             planningContainer.innerHTML = '';
+            chartZoomLevel = 1.0; // Reset zoom level for new chart
 
             const prompt = prompts.planning[brainstormType]
                 .replace('{title}', sanitizeHTML(idea.title))
@@ -547,14 +699,97 @@
 
             try {
                 const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
-                const planText = response.candidates[0].content.parts[0].text.replace(/```markdown\s*([\s\S]*?)\s*```/g, '$1');
-                planningContainer.innerHTML = marked.parse(planText);
+                let planText = response.candidates[0].content.parts[0].text;
+
+                const mermaidRegex = /```mermaid\s*([\s\S]*?)```/;
+                const mermaidMatch = planText.match(mermaidRegex);
+
+                const markdownContent = planText.replace(mermaidRegex, '').replace(/^```markdown\s*|```\s*$/g, '').trim();
+                planningContainer.innerHTML = marked.parse(markdownContent);
+
+                if (mermaidMatch && mermaidMatch[1]) {
+                    const mermaidCode = mermaidMatch[1].trim();
+
+                    const chartWrapper = document.createElement('div');
+                    chartWrapper.className = 'mt-6';
+
+                    const controlsHTML = `
+                        <div id="chart-controls">
+                            <button id="zoom-in-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom In</button>
+                            <button id="zoom-out-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom Out</button>
+                            <button id="reset-zoom-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Reset</button>
+                            <button id="fullscreen-btn" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg ml-auto">Fullscreen</button>
+                        </div>
+                    `;
+                    chartWrapper.innerHTML = controlsHTML;
+
+                    const chartContainer = document.createElement('div');
+                    chartContainer.id = 'chart-container';
+                    const mermaidDiv = document.createElement('div');
+                    mermaidDiv.className = 'mermaid';
+                    chartContainer.appendChild(mermaidDiv);
+                    chartWrapper.appendChild(chartContainer);
+                    planningContainer.appendChild(chartWrapper);
+
+                    try {
+                        const { svg } = await mermaid.render(`mermaid-diag-${Date.now()}`, mermaidCode);
+                        mermaidDiv.innerHTML = svg;
+                        const svgElement = mermaidDiv.querySelector('svg');
+
+                        // Attach event listeners to controls
+                        const zoomInBtn = chartWrapper.querySelector('#zoom-in-btn');
+                        const zoomOutBtn = chartWrapper.querySelector('#zoom-out-btn');
+                        const resetZoomBtn = chartWrapper.querySelector('#reset-zoom-btn');
+                        const fullscreenBtn = chartWrapper.querySelector('#fullscreen-btn');
+
+                        const updateZoom = () => {
+                            svgElement.style.transform = `scale(${chartZoomLevel})`;
+                        };
+
+                        zoomInBtn.onclick = () => {
+                            chartZoomLevel += 0.1;
+                            updateZoom();
+                        };
+                        zoomOutBtn.onclick = () => {
+                            chartZoomLevel = Math.max(0.1, chartZoomLevel - 0.1);
+                            updateZoom();
+                        };
+                        resetZoomBtn.onclick = () => {
+                            chartZoomLevel = 1.0;
+                            updateZoom();
+                        };
+                        fullscreenBtn.onclick = () => {
+                            fullscreenModalContent.innerHTML = ''; // Clear previous
+                            const clonedSvg = svgElement.cloneNode(true);
+                            clonedSvg.style.transform = ''; // Reset transform for modal
+                            clonedSvg.style.maxWidth = '95vw';
+                            clonedSvg.style.maxHeight = '95vh';
+                            fullscreenModalContent.appendChild(clonedSvg);
+                            fullscreenModal.classList.remove('hidden');
+                            fullscreenModal.classList.add('flex'); // Make it a flex container
+                            document.body.style.overflow = 'hidden'; // Prevent background scroll
+                        };
+
+                    } catch (e) {
+                        console.error("Mermaid rendering failed:", e);
+                        mermaidDiv.innerHTML = `<p class="text-red-500 font-bold">Mermaid Chart Error:</p><pre class="text-sm text-red-500 bg-red-50 p-2 rounded">${e.message}</pre><p class="mt-2 font-bold">Chart Code:</p><pre class="text-sm bg-gray-100 p-2 rounded">${sanitizeHTML(mermaidCode)}</pre>`;
+                    }
+                }
             } catch (error) {
                 planningContainer.innerHTML = `<p class="text-red-500">Error generating the final document: ${error.message}</p>`;
             } finally {
                 hideLoader(planningLoader);
             }
         }
+
+        // Fullscreen modal close logic
+        closeFullscreenBtn.addEventListener('click', () => {
+            fullscreenModal.classList.add('hidden');
+            fullscreenModal.classList.remove('flex'); // Remove flex display
+            fullscreenModalContent.innerHTML = '';
+            document.body.style.overflow = 'auto';
+        });
+
     </script>
 </body>
 
