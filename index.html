@@ -9,6 +9,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -193,6 +197,13 @@
                     </select>
                 </div>
                 <div class="mb-4">
+                    <label for="pdf-upload" class="block text-gray-700 font-semibold mb-2">Upload Context PDF (Optional,
+                        e.g., papers from CVPR, NeurIPS, ACL, etc.)</label>
+                    <input type="file" id="pdf-upload" accept="application/pdf"
+                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                    <p id="pdf-status" class="text-sm mt-2 text-gray-600"></p>
+                </div>
+                <div class="mb-4">
                     <label for="topic-input" class="block text-gray-700 font-semibold mb-2">Enter Topic:</label>
                     <div class="flex flex-col sm:flex-row gap-4">
                         <input type="text" id="topic-input"
@@ -265,11 +276,9 @@
         </div>
     </div>
 
-    <!-- Fullscreen Modal for Chart -->
     <div id="fullscreen-modal" class="hidden">
         <span id="close-fullscreen">&times;</span>
         <div id="fullscreen-modal-content">
-            <!-- Fullscreen SVG will be injected here -->
         </div>
     </div>
 
@@ -280,18 +289,20 @@
         let brainstormType = 'project';
         let allParsedIdeas = []; // Holds { role, idea, id } for filtering
         let chartZoomLevel = 1.0;
+        let pdfTextContext = ''; // Holds extracted text from the uploaded PDF
         mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
         // --- PROMPT TEMPLATES ---
         const prompts = {
             persona: {
-                project: `You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas (e.g., Product Manager, Lead Engineer, Marketing Head, User Advocate). For each, provide their Role, Goal, and Backstory.\n\nUse this context: {rag_summary}`,
-                research_paper: `You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas (e.g., Lead Researcher, Literature Review Specialist, Methodology Expert). For each, provide their Role, Goal, and Backstory.\n\nUse this context: {rag_summary}`
+                project: `You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas (e.g., Product Manager, Lead Engineer, Marketing Head, User Advocate). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`,
+                research_paper: `You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas (e.g., Lead Researcher, Literature Review Specialist, Methodology Expert). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`
             },
             rag_summary: `You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text to be used as context for a brainstorming session. Focus on key concepts, definitions, and the current state of the topic.\nSearch Results:\n---\n{search_results}\n---\n\nProvide your summary in a single, dense paragraph.`,
+            pdf: `You are a Research Analyst. Your task is to summarize the following PDF content to provide context for brainstorming:\n\n{pdf_content}\n\nProvide your summary in dense paragraph.`,
             ideation: {
-                project: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique persona, brainstorm 5 innovative project ideas or features about '{topic}'. Use this context: {rag_summary}\n\nYour primary goal is quantity and novelty. Do NOT critique your own ideas. Present your ideas as a simple bulleted list in Markdown.`,
-                research_paper: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique scholarly persona, brainstorm 5 innovative research questions, hypotheses, or study designs related to '{topic}'. Use this context: {rag_summary}\n\nYour primary goal is novelty and potential for scholarly contribution. Do NOT critique your ideas yet. Present your ideas as a simple bulleted list in Markdown.`
+                project: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique persona, brainstorm 5 innovative project ideas or features about '{topic}'. Use this combined context from a web search and a user-provided document: {combined_context}\n\nYour primary goal is quantity and novelty. Do NOT critique your own ideas. Present your ideas as a simple bulleted list in Markdown.`,
+                research_paper: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique scholarly persona, brainstorm 5 innovative research questions, hypotheses, or study designs related to '{topic}'. Use this combined context from a web search and a user-provided document: {combined_context}\n\nYour primary goal is novelty and potential for scholarly contribution. Do NOT critique your ideas yet. Present your ideas as a simple bulleted list in Markdown.`
             },
             evaluation: {
                 project: `You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. De-duplicate them and group similar concepts into project themes.\n2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 project ideas:'. Then, provide a JSON array of objects for the top 3 projects you recommend. Each object needs 'title' and 'description' keys. This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`,
@@ -310,6 +321,8 @@
         const brainstormForm = document.getElementById('brainstorm-form');
         const brainstormTypeInput = document.getElementById('brainstorm-type');
         const topicInput = document.getElementById('topic-input');
+        const pdfUploadInput = document.getElementById('pdf-upload');
+        const pdfStatus = document.getElementById('pdf-status');
         const startBtn = document.getElementById('start-btn');
         const previewAgentLoader = document.getElementById('preview-agent-loader');
         const personaContainer = document.getElementById('persona-container');
@@ -411,6 +424,42 @@
             }
         });
 
+        // PDF Handling Logic
+        pdfUploadInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                pdfStatus.textContent = 'Please select a PDF file.';
+                pdfTextContext = '';
+                return;
+            }
+
+            pdfStatus.textContent = `Processing "${file.name}"...`;
+            pdfTextContext = ''; // Reset context
+
+            try {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const typedarray = new Uint8Array(e.target.result);
+                    const pdf = await pdfjsLib.getDocument(typedarray).promise;
+                    let fullText = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + '\n\n';
+                    }
+                    pdfTextContext = fullText;
+                    pdfStatus.textContent = `Successfully extracted text from "${file.name}".`;
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                console.error('Error processing PDF:', error);
+                pdfStatus.textContent = 'Failed to process PDF. Please try another file.';
+                pdfTextContext = '';
+            }
+        });
+
+
         brainstormForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!userApiKey) {
@@ -431,18 +480,20 @@
             allParsedIdeas = [];
             startBtn.disabled = true;
 
-            // This now runs the RAG search first to provide context for persona generation
-            const ragSummary = await runRagAgent(topic);
-            if (ragSummary && ragSummary !== "Could not generate a summary.") {
-                const personas = await runPreviewAgent(topic, ragSummary);
+            // This now runs the RAG agent first to provide context for persona generation
+            // It will combine the web search with the PDF context
+            const combinedContext = await runRagAndCombineContext(topic, pdfTextContext);
+
+            if (combinedContext && combinedContext !== "Could not generate context.") {
+                const personas = await runPreviewAgent(topic, combinedContext);
                 if (personas && personas.length > 0) {
-                    await runDivergentIdeation(topic, personas, ragSummary);
+                    await runDivergentIdeation(topic, personas, combinedContext);
                 }
             }
             startBtn.disabled = false;
         });
 
-        async function runPreviewAgent(topic, ragSummary) {
+        async function runPreviewAgent(topic, combinedContext) {
             showLoader(previewAgentLoader);
             personaContainer.innerHTML = '';
             const schema = {
@@ -452,7 +503,7 @@
             };
             const prompt = prompts.persona[brainstormType]
                 .replace('{topic}', sanitizeHTML(topic))
-                .replace('{rag_summary}', ragSummary); // Use the RAG summary
+                .replace('{combined_context}', combinedContext);
             try {
                 const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }], { responseMimeType: "application/json", responseSchema: schema });
                 const personaData = JSON.parse(response.candidates[0].content.parts[0].text);
@@ -474,83 +525,90 @@
 
 
         async function duckDuckGoSearch(query) {
-            const proxyUrl = 'https://corsproxy.io/?url=';
+            const proxyUrls = [
+                'https://api.allorigins.win/raw?url=', // Primary proxy
+                'https://corsproxy.io/?url='           // Backup proxy
+            ];
             const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
 
-            try {
-                const response = await fetch(proxyUrl + searchUrl);
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok: ${response.statusText}`);
+            for (const proxyUrl of proxyUrls) {
+                try {
+                    console.log(`Attempting search with proxy: ${proxyUrl}`);
+                    const response = await fetch(proxyUrl + searchUrl);
+
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok. Status: ${response.status}`);
+                    }
+
+                    const htmlText = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlText, 'text/html');
+
+                    const snippets = [];
+                    const snippetNodes = doc.querySelectorAll('.result__snippet');
+
+                    if (snippetNodes.length === 0) {
+                        throw new Error("Proxy returned no valid search snippets.");
+                    }
+
+                    snippetNodes.forEach(node => {
+                        snippets.push(node.innerText.trim());
+                    });
+
+                    console.log(`Successfully fetched results with: ${proxyUrl}`);
+                    return snippets.join('\n\n');
+
+                } catch (error) {
+                    console.warn(`Proxy failed: ${proxyUrl}`, error.message);
                 }
-                const htmlText = await response.text();
-
-                // Use DOMParser to turn the HTML string into a document we can query.
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlText, 'text/html');
-
-                // Extract snippets from the search results.
-                const snippets = [];
-                const snippetNodes = doc.querySelectorAll('.result__snippet');
-
-                snippetNodes.forEach(node => {
-                    snippets.push(node.innerText.trim());
-                });
-
-                if (snippets.length === 0) {
-                    return "No search results found from DuckDuckGo. The page structure may have changed or the topic is very obscure.";
-                }
-
-                // Return the snippets joined as a single string.
-                return snippets.join('\n\n');
-            } catch (error) {
-                console.error('DuckDuckGo search failed:', error);
-                return `Failed to retrieve search results. Error: ${error.message}`;
             }
+
+            console.error("All proxies failed.");
+            throw new Error("Failed to retrieve search results after trying all backup proxies.");
         }
 
 
-        async function runRagAgent(topic) {
+        async function runRagAndCombineContext(topic, pdfContent) {
             stageRagContainer.classList.remove('hidden');
             showLoader(ragLoader, 'Research Agent is performing a web search via DuckDuckGo...');
             ragSummaryContainer.innerHTML = '';
 
             try {
-                // 1. & 2. Perform web search with our custom DuckDuckGo function.
                 const searchResults = await duckDuckGoSearch(topic);
-
-                if (searchResults.startsWith('Failed') || searchResults.startsWith('No search')) {
-                    throw new Error(searchResults);
-                }
 
                 ragLoaderText.textContent = 'Web search complete. Summarizing results...';
 
-                // 3. Create the prompt for summarization with the retrieved results.
                 const summarizerPromptText = prompts.rag_summary.replace('{search_results}', searchResults);
-
-                // 4. Call Gemini to summarize the search results.
                 const response = await callGemini([{ role: "user", parts: [{ text: summarizerPromptText }] }]);
-                const summaryText = response.candidates[0].content.parts[0].text;
+                const webSummaryText = response.candidates[0].content.parts[0].text;
 
-                // 5. Display summary and return it for the next stage.
-                ragSummaryContainer.innerHTML = marked.parse(summaryText);
+                // Combine PDF context with web summary
+                let combinedContext = `**Web Search Summary:**\n${webSummaryText}`;
+                if (pdfContent) {
+                    const pdfSummaryPrompt = prompts.pdf.replace('{pdf_content}', pdfContent);
+                    const pdf_response = await callGemini([{ role: "user", parts: [{ text: pdfContent }] }]);
+                    const pdfSummaryText = pdf_response.candidates[0].content.parts[0].text;
+                    combinedContext += `\n\n---\n\n**Uploaded Document Context:**\n${pdfSummaryText}`;
+                }
+
+                ragSummaryContainer.innerHTML = marked.parse(combinedContext);
                 hideLoader(ragLoader);
-                return summaryText;
+                return combinedContext;
 
             } catch (error) {
-                console.error("Error in runRagAgent:", error);
+                console.error("Error in RAG process:", error);
                 hideLoader(ragLoader);
-                ragSummaryContainer.innerHTML = `<p class="text-red-500">Error during RAG process: ${error.message}</p>`;
-                return "Could not generate a summary.";
+                ragSummaryContainer.innerHTML = `<p class="text-red-500">Error during context generation: ${error.message}</p>`;
+                return "Could not generate context.";
             }
         }
 
 
-        async function runDivergentIdeation(topic, personas, ragSummary) {
+        async function runDivergentIdeation(topic, personas, combinedContext) {
             showLoader(divergentLoader);
             ideasContainer.innerHTML = '';
             allParsedIdeas = [];
             const RATE_LIMIT_DELAY = 1000;
-
             let ideaCounter = 0;
             const ideaPattern = /^\s*[\*\-]\s*(.*)/gm;
 
@@ -560,7 +618,7 @@
                     .replace('{backstory}', persona.backstory)
                     .replace('{goal}', persona.goal)
                     .replace('{topic}', sanitizeHTML(topic))
-                    .replace('{rag_summary}', ragSummary);
+                    .replace('{combined_context}', combinedContext);
 
                 try {
                     const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
