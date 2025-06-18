@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Agent Brainstorming System (Client-Side)</title>
+    <title>Multi-Agent Brainstorming System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -162,7 +162,9 @@
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Multi-Agent Brainstorming System</h1>
             <p class="mt-2 text-lg text-gray-600">A Client-Side AI Agent System Running in Your Browser</p>
             <p class="text-sm text-gray-600 mt-1">By Yuxiang | <a href="mailto:yuxiang.lin@gatech.edu"
-                    class="text-blue-500 hover:underline">yuxiang.lin@gatech.edu</a></p>
+                    class="text-blue-500 hover:underline">yuxiang.lin@gatech.edu</a> | Give a star at: <a
+                    href="https://github.com/Lum1104/agent-brainstorm" target="_blank"
+                    class="text-blue-500 hover:underline">GitHub</a></p>
             <p class="text-xs text-gray-500 mt-1">Feel free to contact for any advice.</p>
         </header>
 
@@ -295,22 +297,22 @@
         // --- PROMPT TEMPLATES ---
         const prompts = {
             persona: {
-                project: `You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas (e.g., Product Manager, Lead Engineer, Marketing Head, User Advocate). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`,
-                research_paper: `You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas (e.g., Lead Researcher, Literature Review Specialist, Methodology Expert). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`
+                project: `You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas (e.g., Product Manager, Lead Engineer, etc). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`,
+                research_paper: `You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas (e.g., Methodology Expert, etc). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`
             },
             rag_summary: `You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text to be used as context for a brainstorming session. Focus on key concepts, definitions, and the current state of the topic.\nSearch Results:\n---\n{search_results}\n---\n\nProvide your summary in a single, dense paragraph.`,
             pdf: `You are a Research Analyst. Your task is to summarize the following PDF content to provide context for brainstorming:\n\n{pdf_content}\n\nProvide your summary in dense paragraph.`,
             ideation: {
-                project: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique persona, brainstorm 5 innovative project ideas or features about '{topic}'. Use this combined context from a web search and a user-provided document: {combined_context}\n\nYour primary goal is quantity and novelty. Do NOT critique your own ideas. Present your ideas as a simple bulleted list in Markdown.`,
-                research_paper: `Your Persona:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nBased on your unique scholarly persona, brainstorm 5 innovative research questions, hypotheses, or study designs related to '{topic}'. Use this combined context from a web search and a user-provided document: {combined_context}\n\nYour primary goal is novelty and potential for scholarly contribution. Do NOT critique your ideas yet. Present your ideas as a simple bulleted list in Markdown.`
+                project: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to brainstorm 5 innovative and unconventional project ideas or features about '{topic}'. Think from first principles, drawing on your unique backstory and the provided context: {combined_context}\n\nYour primary goal is novelty and quantity. Do NOT critique or elaborate on the ideas.\n\nFor each of the 5 ideas, provide the following in Markdown:\n- **Idea:** A concise name for the project/feature.\n- **Target Audience:** The specific user or group who would benefit most.\n- **Problem Solved:** The core pain point this idea addresses.\n- **My Rationale:** A single sentence on why your unique persona suggests this.`,
+                research_paper: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to formulate 5 novel research ideas related to '{topic}'. Aim for ideas with high potential for scholarly contribution. Use the provided context: {combined_context}\n\nDo not critique the feasibility of the ideas yet.\n\nFor each of the 5 ideas, provide the following in Markdown:\n- **Research Question:** The core question the study would seek to answer.\n- **Potential Methodology:** A brief suggestion of the research approach (e.g., \"Quantitative Analysis,\" \"Qualitative Case Study,\" \"Algorithm Development\").\n- **Potential Contribution:** The specific gap in knowledge this research could fill.\n- **My Rationale:** A single sentence on why your unique scholarly perspective makes this question compelling.`
             },
             evaluation: {
                 project: `You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. De-duplicate them and group similar concepts into project themes.\n2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 project ideas:'. Then, provide a JSON array of objects for the top 3 projects you recommend. Each object needs 'title' and 'description' keys. This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`,
                 research_paper: `You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. Group similar concepts into distinct research avenues.\n2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty/Originality (1-10)', 'Methodological Soundness (1-10)', 'Potential Contribution (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 research ideas:'. Then, provide a JSON array of objects for the top 3 research questions you recommend. Each object needs 'title' (a concise research question) and 'description' (a brief explanation of the study). This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`
             },
             planning: {
-                project: `You are an expert AI Project Manager. A promising idea has been selected. Generate a detailed, concise project initiation document in Markdown.\n\n**Selected Idea:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease include these sections:\n### High-Level Requirements & User Stories\n### Proposed Technology Stack\n### Phased Project Timeline (with estimated weeks)\n### Initial Resource Estimation (roles needed)\n\nFinally, create a Mermaid flowchart to visualize the project timeline. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. For example:\n\`\`\`mermaid\ngraph TD;\n    A["Phase 1: Discovery & Research (4 weeks)"] --> B["Phase 2: Design & Prototyping (6 weeks)"];\n    B --> C["Phase 3: Development & Testing (8 weeks)"];\n    C --> D["Phase 4: Deployment & Launch (2 weeks)"];\n\`\`\`\n`,
-                research_paper: `You are an experienced academic writer. A promising research idea has been selected. Generate a concise research paper outline or abstract in Markdown.\n\n**Selected Research Question:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease include these sections:\n### 1. Introduction & Problem Statement\n### 2. Preliminary Literature Review\n### 3. Proposed Methodology\n### 4. Expected Outcomes & Contribution to the Field\n### 5. Potential Target Conferences for Publication\n\nFinally, create a Mermaid flowchart to visualize the research stages. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. For example:\n\`\`\`mermaid\ngraph TD;\n    A["Literature Review"] --> B["Formulate Hypothesis"];\n    B --> C["Design Experiment"];\n    C --> D["Collect & Analyze Data"];\n    D --> E["Write Paper"];\n\`\`\`\n`
+                project: `You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title and description.\n\n**Selected Idea:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease structure your response in Markdown with the following sections:\n\n### 1. Project Overview & Business Case\n* **Inferred Business Domain:** Based on the title and description, first identify the specific business domain or industry this project belongs to (e.g., FinTech - Algorithmic Trading, Healthcare - Diagnostic AI, E-commerce - Recommendation Systems).\n* **Problem Statement & Opportunity:** Briefly introduce the business problem the project solves or the market opportunity it captures.\n* **Project Goals & Objectives:** Clearly articulate the primary business goal and list 2-3 specific, measurable (SMART) objectives for the project.\n\n### 2. Scope, Technology & Execution Plan\n* **Project Approach:** Propose a primary project management methodology (e.g., Agile-Scrum, Kanban, Waterfall) and justify its selection.\n* **Core Features & Requirements:**\n    * **In-Scope Features:** List the high-level features or epics that define the core functionality of the final product.\n    * **Proposed Technology Stack:** Recommend a specific technology stack (e.g., Frontend, Backend, Database, AI/ML Libraries, Cloud Infrastructure).\n* **Quality Assurance & Success Metrics:**\n    * **Testing Strategy:** Outline the methods for ensuring quality (e.g., unit testing, integration testing, user acceptance testing).\n    * **Key Performance Indicators (KPIs):** Define clear, quantifiable metrics to evaluate the project's success post-launch (e.g., user engagement, revenue increase, cost reduction, system performance).\n\n### 3. Expected Deliverables & Business Impact\n* **Key Project Deliverables:** List the tangible outputs the project will produce (e.g., Deployed production API, interactive user dashboard, technical documentation).\n* **Anticipated Business Impact:** Explain how this project, if successful, would contribute to the business. What specific strategic, financial, or operational value would it deliver?\n* **Initial Resource Plan:** Estimate the core team roles required to execute the project (e.g., Project Manager, AI/ML Engineer, Backend Developer, UI/UX Designer, QA Analyst).\n\n### 4. Phased Project Roadmap\n* Provide a high-level project timeline, broken down into distinct phases with estimated durations in weeks.\n\nFinally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. The flowchart should break down the project phases into more granular tasks and milestones. For example:\n\`\`\`mermaid\ngraph TD;\n    subgraph "Phase 1: Discovery & Planning (3 Weeks)"\n        A["Kick-off & Stakeholder Alignment"] --> B["Market Research & Competitive Analysis"];\n        B --> C["Finalize Requirements & Define KPIs"];\n        C --> D["Develop Detailed Project Roadmap & Resource Plan"];\n    end\n    \n    subgraph "Phase 2: Design & Prototyping (4 Weeks)"\n        E["Architectural Design & Tech Stack Finalization"] --> F["Data Sourcing & Preparation"];\n        F --> G["Wireframing & UI/UX Design"];\n        G --> H["Build Interactive Prototype & Conduct User Feedback Session"];\n    end\n    \n    subgraph "Phase 3: Development & QA (8 Weeks)"\n        I["Sprint 1-3: Core Feature Development (Backend & AI Model)"] --> J["Sprint 4-5: Frontend Development & API Integration"];\n        J --> K["Continuous Integration & Unit/Integration Testing"];\n        K --> L["User Acceptance Testing (UAT) & Bug Fixing"];\n    end\n    \n    subgraph "Phase 4: Deployment & Launch (2 Weeks)"\n        M["Prepare Production Environment"] --> N["Deploy Application & Monitor Stability"];\n        N --> O["Official Launch & Internal Handoff to Operations Team"];\n    end\n\n    D --> E;\n    H --> I;\n    L --> M;\n    O --> P["Phase 5: Post-Launch Monitoring & Iteration"];\n\`\`\`\n`,
+                research_paper: `You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline based on the provided title and description.\n\n**Selected Research Question:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease structure your response in Markdown with the following sections:\n\n### 1. Inferred Research Field & Problem Statement\n* **Inferred Field:** Based on the title and description, first identify and state the specific academic field and sub-field this research belongs to (e.g., Computer Science - Natural Language Processing, Sociology - Urban Studies, Bioinformatics, etc.).\n* **Problem Context:** Briefly introduce the broader context of the problem.\n* **Core Challenge & Objectives:** Clearly articulate the central challenge the research addresses and list 2-3 specific, actionable objectives.\n\n### 2. Detailed Proposed Methodology\n* **Research Design:** Propose a primary research design appropriate for the inferred field (e.g., Experimental Study, Quantitative Survey, Qualitative Case Study, Algorithm Development & Benchmarking).\n\n* **Data & Procedures:**\n    * **Data Requirements:** Describe the type of data or corpus needed (e.g., a specific dataset, survey responses from a target demographic, textual corpus, patient data).\n    * **Execution Steps:** Provide a step-by-step plan for conducting the research, from data acquisition/preparation to execution.\n* **Analysis & Evaluation:**\n    * **Analysis Techniques:** Suggest specific methods for analyzing the results (e.g., statistical tests like regression analysis, ML model training protocols, thematic analysis of interviews).\n    * **Evaluation Metrics:** Define clear metrics to evaluate the success of the outcomes (e.g., model accuracy/F1-score, statistical significance (p-value), improvement over a baseline).\n\n### 3. Expected Outcomes & Contribution\n* **Hypothesized Outcomes:** Briefly state the expected findings or results of the research.\n* **Contribution to the Field:** Explain how this research, if successful, would contribute to the **inferred academic field**. What specific theoretical or practical advancements would it offer?\n\n### 4. Potential Target Publication Venues\n* Based on the **inferred field**, recommend 2-3 highly relevant and reputable academic conferences or journals for publication.\n\nFinally, create a Mermaid flowchart to visualize the research stages. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. The flowchart should reflect the detailed methodology, showing how different stages connect and how analysis can be multi-faceted. Here is a comprehensive example:\n\`\`\`mermaid\ngraph TD;\n    subgraph "Phase 1: Problem Definition & Literature Review"\n        A["Define Research Questions & Hypotheses"] --> B["Conduct Literature Review"];\n    end\n\n    subgraph "Phase 2: Data & Methodology"\n       C["Select Research Design (e.g., Algorithm Development)"] --> D["Data Acquisition & Preprocessing"];\n    end\n\n    subgraph "Phase 3: Model Development & Experimentation"\n        E["Develop Baseline & Proposed Models"] --> F["Experiment Execution: Run all models on the prepared dataset"];\n    end\n    \n    subgraph "Phase 4: Multi-Faceted Analysis & Evaluation"\n        F --> G["Performance Analysis: Compare model accuracy, F1-scores, etc."];\n        F --> H["Robustness Analysis: Test against noisy data or adversarial inputs"];\n        F --> I["Computational Cost Analysis: Measure inference time and memory usage"];\n        G --> J["Results Consolidation & Statistical Significance Testing"];\n        H --> J;\n        I --> J;\n    end\n\n    subgraph "Phase 5: Synthesis & Dissemination"\n        K["Synthesize All Findings & Draw Conclusions"] --> L["Write Manuscript"];\n        L --> M["Submit to Target Journal/Conference"];\n    end\n\n    B --> C;\n    D --> E;\n    J --> K;\n\`\`\``
             }
         };
 
@@ -533,7 +535,7 @@
 
             for (const proxyUrl of proxyUrls) {
                 try {
-                    console.log(`Attempting search with proxy: ${proxyUrl}`);
+                    // console.log(`Attempting search with proxy: ${proxyUrl}`);
                     const response = await fetch(proxyUrl + searchUrl);
 
                     if (!response.ok) {
@@ -555,7 +557,7 @@
                         snippets.push(node.innerText.trim());
                     });
 
-                    console.log(`Successfully fetched results with: ${proxyUrl}`);
+                    // console.log(`Successfully fetched results with: ${proxyUrl}`);
                     return snippets.join('\n\n');
 
                 } catch (error) {
@@ -610,7 +612,6 @@
             allParsedIdeas = [];
             const RATE_LIMIT_DELAY = 1000;
             let ideaCounter = 0;
-            const ideaPattern = /^\s*[\*\-]\s*(.*)/gm;
 
             for (const persona of personas) {
                 const prompt = prompts.ideation[brainstormType]
@@ -628,23 +629,79 @@
                     personaIdeasContainer.className = 'agent-card bg-white p-4 rounded-lg border';
                     personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3>`;
 
-                    let match;
-                    while ((match = ideaPattern.exec(ideasText)) !== null) {
-                        const ideaText = match[1].trim();
-                        const ideaId = `idea-${ideaCounter++}`;
-                        allParsedIdeas.push({ role: persona.role, idea: ideaText, id: ideaId });
+                    // A more robust regex to find each complete idea block
+                    const ideaBlockRegex = /- \*\*(Idea|Research Question):\*\*([\s\S]*?)(?=- \*\*(Idea|Research Question):\*\*|$)/g;
+                    const matches = [...ideasText.matchAll(ideaBlockRegex)];
 
-                        const checkboxContainer = document.createElement('div');
-                        checkboxContainer.className = 'flex items-start gap-2 p-2 rounded-md hover:bg-gray-50';
-                        checkboxContainer.innerHTML = `
-                            <input type="checkbox" id="${ideaId}" data-role="${sanitizeHTML(persona.role)}" data-idea="${sanitizeHTML(ideaText)}" checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            <label for="${ideaId}" class="text-gray-700">${sanitizeHTML(ideaText)}</label>
-                        `;
-                        personaIdeasContainer.appendChild(checkboxContainer);
+
+                    for (const match of matches) {
+                        const block = match[0]; // The full text of one idea block
+
+                        // Use specific regexes to pull data from the block
+                        const ideaTitleMatch = block.match(/- \*\*(?:Idea|Research Question):\*\*\s*(.*?)\n/);
+                        const targetAudienceMatch = block.match(/- \*\*Target Audience:\*\*\s*(.*?)\n/);
+                        const problemSolvedMatch = block.match(/- \*\*Problem Solved:\*\*\s*(.*?)\n/);
+                        const rationaleMatch = block.match(/- \*\*My Rationale:\*\*\s*(.*)/s); // Use 's' flag for multiline
+                        // Fields for research paper
+                        const methodologyMatch = block.match(/- \*\*Potential Methodology:\*\*\s*(.*?)\n/);
+                        const contributionMatch = block.match(/- \*\*Potential Contribution:\*\*\s*(.*?)\n/);
+
+                        let ideaData = {};
+                        let isValid = false;
+
+                        if (brainstormType === 'project' && ideaTitleMatch && targetAudienceMatch && problemSolvedMatch && rationaleMatch) {
+                            ideaData = {
+                                title: ideaTitleMatch[1].trim(),
+                                targetAudience: targetAudienceMatch[1].trim(),
+                                problemSolved: problemSolvedMatch[1].trim(),
+                                rationale: rationaleMatch[1].trim()
+                            };
+                            isValid = true;
+                        } else if (brainstormType === 'research_paper' && ideaTitleMatch && methodologyMatch && contributionMatch && rationaleMatch) {
+                            ideaData = {
+                                title: ideaTitleMatch[1].trim(),
+                                potentialMethodology: methodologyMatch[1].trim(),
+                                potentialContribution: contributionMatch[1].trim(),
+                                rationale: rationaleMatch[1].trim()
+                            };
+                            isValid = true;
+                        }
+
+                        if (isValid) {
+                            const ideaId = `idea-${ideaCounter++}`;
+                            allParsedIdeas.push({ role: persona.role, idea: ideaData, id: ideaId });
+
+                            const checkboxContainer = document.createElement('div');
+                            checkboxContainer.className = 'flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 border-b';
+                            const ideaDataString = JSON.stringify(ideaData);
+
+                            // Build the display HTML dynamically based on type
+                            let displayHTML = `<label for="${ideaId}" class="font-semibold text-gray-800">${sanitizeHTML(ideaData.title)}</label><div class="text-sm text-gray-600 pl-2">`;
+                            if (brainstormType === 'project') {
+                                displayHTML += `
+                                    <p class="mt-1"><strong class="text-gray-700">For:</strong> ${sanitizeHTML(ideaData.targetAudience)}</p>
+                                    <p class="mt-1"><strong class="text-gray-700">Problem:</strong> ${sanitizeHTML(ideaData.problemSolved)}</p>`;
+                            } else {
+                                displayHTML += `
+                                    <p class="mt-1"><strong class="text-gray-700">Methodology:</strong> ${sanitizeHTML(ideaData.potentialMethodology)}</p>
+                                    <p class="mt-1"><strong class="text-gray-700">Contribution:</strong> ${sanitizeHTML(ideaData.potentialContribution)}</p>`;
+                            }
+                            displayHTML += `<p class="mt-1"><strong class="text-gray-700">Rationale:</strong> <em class="text-gray-500">${sanitizeHTML(ideaData.rationale)}</em></p></div>`;
+
+                            checkboxContainer.innerHTML = `
+                                <input type="checkbox" id="${ideaId}" data-role="${sanitizeHTML(persona.role)}" data-idea='${sanitizeHTML(ideaDataString)}' checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 shrink-0">
+                                <div>${displayHTML}</div>
+                            `;
+                            personaIdeasContainer.appendChild(checkboxContainer);
+                        } else {
+                            // --- DEBUGGING LOG ---
+                            console.warn(`[${persona.role}] Failed to validate block. Content:`, block);
+                        }
                     }
                     ideasContainer.appendChild(personaIdeasContainer);
 
                 } catch (error) {
+                    console.error("Error in runDivergentIdeation for persona " + persona.role, error);
                     const errorCard = document.createElement('div');
                     errorCard.className = 'agent-card bg-white p-4 rounded-lg border';
                     errorCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3><p class="text-red-500 p-2 text-center">Error generating ideas.</p>`;
@@ -660,44 +717,49 @@
         }
 
         toConvergentBtn.addEventListener('click', () => {
-            const selectedIdeas = [];
-            const checkboxes = ideasContainer.querySelectorAll('input[type="checkbox"]:checked');
+            // Get the IDs of the checked checkboxes
+            const selectedIdeaIds =
+                Array.from(ideasContainer.querySelectorAll('input[type="checkbox"]:checked'))
+                    .map(cb => cb.id);
 
-            checkboxes.forEach(cb => {
-                selectedIdeas.push({
-                    role: cb.dataset.role,
-                    idea: cb.dataset.idea
-                });
-            });
-
-            if (selectedIdeas.length === 0) {
+            if (selectedIdeaIds.length === 0) {
                 alert("Please select at least one idea to proceed.");
                 return;
             }
 
-            const ideasByRole = selectedIdeas.reduce((acc, current) => {
-                acc[current.role] = acc[current.role] || [];
-                acc[current.role].push(`- ${current.idea}`);
-                return acc;
-            }, {});
+            // Find the full idea objects from the global array using the selected IDs
+            const selectedIdeas = allParsedIdeas.filter(parsedIdea => selectedIdeaIds.includes(parsedIdea.id));
 
-            const ideasForEvaluation = Object.keys(ideasByRole).map(role => ({
-                role: role,
-                ideas: ideasByRole[role].join('\n')
-            }));
+            // Format the selected ideas into a high-quality string for the next agent
+            const rawIdeasString = selectedIdeas.map(item => {
+                const ideaObj = item.idea; // The idea is already a parsed object
+                let summary = `- (From ${item.role}) **${ideaObj.title}**\n`;
+
+                if (brainstormType === 'project') {
+                    summary += `  - **For:** ${ideaObj.targetAudience}\n`;
+                    summary += `  - **Problem:** ${ideaObj.problemSolved}\n`;
+                } else { // research_paper
+                    summary += `  - **Methodology:** ${ideaObj.potentialMethodology}\n`;
+                    summary += `  - **Contribution:** ${ideaObj.potentialContribution}\n`;
+                }
+                summary += `  - **Rationale:** ${ideaObj.rationale}`;
+                return summary;
+            }).join('\n\n---\n\n');
+
 
             stage3Container.classList.remove('hidden');
             window.scrollTo({ top: stage3Container.offsetTop, behavior: 'smooth' });
             toConvergentBtn.classList.add('hidden');
-            runConvergentEvaluation(ideasForEvaluation);
+            runConvergentEvaluation(rawIdeasString);
         });
 
-        async function runConvergentEvaluation(ideas) {
+        async function runConvergentEvaluation(rawIdeasString) {
             showLoader(convergentLoader);
             evaluationContainer.innerHTML = '';
             topIdeasContainer.innerHTML = '';
 
-            const rawIdeasString = ideas.map(item => `Ideas from ${item.role}:\n${item.ideas}`).join('\n\n---\n\n');
+            // console.log("Running convergent evaluation with ideas:", rawIdeasString);
+
             const prompt = prompts.evaluation[brainstormType].replace('{raw_ideas}', rawIdeasString);
 
             try {
