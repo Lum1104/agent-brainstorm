@@ -520,13 +520,13 @@ toConvergentBtn.addEventListener('click', () => {
 
         let summary = ``;
         if (brainstormType === 'project') {
-            summary = `- (From ${item.persona.Role}) **${item.idea}**\n`;
-            summary += `  - ** For:** ${item.target_audience} \n - ** Problem:** ${ideaObj.problem_solved} \n`;
+            summary = `- (From ${item.Role}) **${item.idea.idea}**\n`;
+            summary += `  - ** For:** ${item.idea.target_audience} \n - ** Problem:** ${item.idea.problem_solved} \n`;
         } else {
-            summary = `- (From ${item.persona.Role}) **${item.research_question}**\n`;
-            summary += `  - ** Methodology:** ${item.potential_methodology} \n - ** Contribution:** ${item.potential_contribution} \n`;
+            summary = `- (From ${item.Role}) **${item.idea.research_question}**\n`;
+            summary += `  - ** Methodology:** ${item.idea.potential_methodology} \n - ** Contribution:** ${item.idea.potential_contribution} \n`;
         }
-        summary += `  - ** Rationale:** ${item.rationale} `;
+        summary += `  - ** Rationale:** ${item.idea.rationale} `;
         return summary;
     }).join('\n\n---\n\n');
 
