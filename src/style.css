@@ -1,0 +1,411 @@
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.agent-card {
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.stage-title {
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.loader {
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Prose styles for rendered markdown */
+.prose h1,
+.prose h2,
+.prose h3 {
+    font-weight: 600;
+}
+
+.prose ul {
+    list-style-type: disc;
+    margin-left: 1.5rem;
+}
+
+.prose table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    /* Important for controlling cell widths */
+}
+
+.prose th,
+.prose td {
+    border: 1px solid #d1d5db;
+    padding: 0.75rem 1rem;
+    word-wrap: break-word;
+    vertical-align: top;
+}
+
+.prose th {
+    background-color: #f9fafb;
+}
+
+.prose pre {
+    background-color: #f3f4f6;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Styles for Collapsible Table Cells */
+.collapsible-wrapper {
+    position: relative;
+}
+
+.collapsible-content {
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.collapsible-content.collapsed {
+    max-height: 2em;
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+.toggle-expand {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #3b82f6;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    display: inline-block;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.toggle-expand:hover {
+    text-decoration: underline;
+}
+
+/* Styles for Mermaid Chart and Controls */
+#chart-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    align-items: center;
+}
+
+#chart-container {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background-color: #f9fafb;
+    overflow: auto;
+    max-height: 40vh;
+    resize: vertical;
+}
+
+#chart-container .mermaid {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100%;
+}
+
+#chart-container .mermaid svg {
+    max-width: none;
+    height: auto;
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.75rem;
+    width: 100%;
+    max-width: 40rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Set specific widths for the evaluation table columns */
+#evaluation-container table th:nth-child(1),
+#evaluation-container table td:nth-child(1) {
+    width: 18%;
+}
+
+#evaluation-container table th:nth-child(2),
+#evaluation-container table td:nth-child(2) {
+    width: 32%;
+}
+
+/* Make score columns narrower */
+#evaluation-container table th:nth-child(3),
+#evaluation-container table td:nth-child(3) {
+    width: 7%;
+    text-align: center;
+}
+
+#evaluation-container table th:nth-child(4),
+#evaluation-container table td:nth-child(4),
+#evaluation-container table th:nth-child(5),
+#evaluation-container table td:nth-child(5) {
+    width: 10%;
+    text-align: center;
+}
+
+#evaluation-container table th:nth-child(6),
+#evaluation-container table td:nth-child(6) {
+    width: 26%;
+}
+
+.progress-sidebar {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 25px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 1.5rem 1rem;
+    min-width: 80px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 0.5rem;
+    margin: 0.5rem 0;
+    border-radius: 15px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-step::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg,
+            transparent,
+            rgba(255, 255, 255, 0.1),
+            transparent);
+    transform: rotate(45deg);
+    transition: transform 0.6s;
+    opacity: 0;
+}
+
+.progress-step:hover::before {
+    transform: rotate(45deg) translate(50%, 50%);
+    opacity: 1;
+}
+
+.progress-step.completed {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.progress-step.completed::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.4),
+            transparent);
+    animation: shimmer 2s infinite;
+}
+
+.progress-step.active {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+    transform: scale(1.05);
+}
+
+.progress-step.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.6),
+            transparent);
+    animation: shimmer 1.5s infinite;
+}
+
+.progress-step.pending {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+.step-number {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.step-number::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    padding: 2px;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: xor;
+    -webkit-mask-composite: xor;
+    opacity: 0;
+    animation: rotateBorder 3s linear infinite;
+}
+
+.step-number.completed {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+}
+
+.step-number.active {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
+}
+
+.step-number.active::before {
+    opacity: 1;
+}
+
+.step-number.pending {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.step-title {
+    font-size: 0.75rem;
+    line-height: 1.1;
+    text-align: center;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 连接线 */
+.progress-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: -0.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 1rem;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+}
+
+.progress-step.completed:not(:last-child)::after {
+    background: linear-gradient(to bottom, #10b981, rgba(16, 185, 129, 0.3));
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+
+    100% {
+        left: 100%;
+    }
+}
+
+@keyframes rotateBorder {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* 在小屏幕上隐藏进度条 */
+@media (max-width: 1920px) and (min-width: 1101px) {
+    .step-title {
+        display: none;
+    }
+
+    .progress-sidebar {
+        min-width: 60px;
+        padding: 1rem 0.5rem;
+    }
+
+    .progress-step {
+        padding: 0.75rem 0.25rem;
+    }
+}
+
+/* 在小屏幕上完全隐藏进度条 */
+@media (max-width: 1100px) {
+    .progress-sidebar {
+        display: none;
+    }
+}
