@@ -281,6 +281,7 @@ async function runPreviewAgent(topic, combinedContext) {
     } catch (error) {
         hideLoader(previewAgentLoader);
         personaContainer.innerHTML = `<p class="text-red-500 text-center col-span-full">Error: Could not assemble the agent team.</p>`;
+        console.error("Error in runPreviewAgent:", error);
         return null;
     }
 }
@@ -517,6 +518,7 @@ async function runConvergentEvaluation(rawIdeasString) {
         brainstormState.evaluationOutput = evaluationText; // Save for restoration
         renderConvergentEvaluation(evaluationText);
     } catch (error) {
+        console.error("Error in runConvergentEvaluation:", error);
         evaluationContainer.innerHTML = `<p class="text-red-500">Error during evaluation: ${error.message}</p>`;
     } finally {
         hideLoader(convergentLoader);
@@ -697,6 +699,7 @@ async function runImplementationPlanning(idea) {
         shareExportContainer.classList.add('flex');
         updateProgress(5);
     } catch (error) {
+        console.error("Error in runImplementationPlanning:", error);
         planningContainer.innerHTML = `<p class="text-red-500">Error generating the final document: ${error.message}</p>`;
     } finally {
         hideLoader(planningLoader);
