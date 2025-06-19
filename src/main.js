@@ -71,10 +71,6 @@ async function callGemini(contents, generationConfig = {}) {
             config: generationConfig
         });
 
-
-        // The SDK response object (`response`) is structured similarly to the raw API response,
-        // making it a compatible replacement for the rest of the application logic.
-
         // Handle potential errors or empty responses
         if (!response) {
             throw new Error("Received an empty response from the Gemini API.");
@@ -402,18 +398,55 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
             .replace('{topic}', sanitizeHTML(topic))
             .replace('{combined_context}', combinedContext);
 
+        let rawResponseText = "";
+
         try {
             const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
-            const ideasText = response.candidates[0].content.parts[0].text;
-            brainstormState.ideationOutputs[persona.Role] = ideasText; // Save for restoration
-            renderIdeationBlock(persona, ideasText, ideaCounter);
-            ideaCounter += 5; // approx
+            rawResponseText = response.candidates[0].content.parts[0].text;
+
+
+            // 1. PARSE: Safely parse the JSON response from the model
+            const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
+            const match = rawResponseText.match(jsonRegex);
+            const jsonString = match ? match[1] : rawResponseText;
+            const ideasData = JSON.parse(jsonString);
+
+            const ideasKey = brainstormType === 'project' ? 'project_ideas' : 'research_ideas';
+            const ideasArray = ideasData[ideasKey];
+
+            if (!ideasArray || !Array.isArray(ideasArray)) {
+                throw new Error(`Parsed JSON from ${persona.Role} does not contain a valid '${ideasKey}' array.`);
+            }
+
+            let reconstructedMarkdown = "";
+            if (brainstormType === 'project') {
+                reconstructedMarkdown = ideasArray.map(idea =>
+                    `- **Idea:** ${sanitizeHTML(idea.idea || '')}\n- **Target Audience:** ${sanitizeHTML(idea.target_audience || '')}\n- **Problem Solved:** ${sanitizeHTML(idea.problem_solved || '')}\n- **My Rationale:** ${sanitizeHTML(idea.rationale || '')}`
+                ).join('\n\n<hr class="my-3">\n\n'); // Use an <hr> for clear visual separation
+            } else { // research_paper
+                reconstructedMarkdown = ideasArray.map(idea =>
+                    `- **Research Question:** ${sanitizeHTML(idea.research_question || '')}\n- **Potential Methodology:** ${sanitizeHTML(idea.potential_methodology || '')}\n- **Potential Contribution:** ${sanitizeHTML(idea.potential_contribution || '')}\n- **My Rationale:** ${sanitizeHTML(idea.rationale || '')}`
+                ).join('\n\n<hr class="my-3">\n\n');
+            }
+
+            brainstormState.ideationOutputs[persona.Role] = reconstructedMarkdown; // Save for restoration
+
+            const startingIdeaCounter = ideaCounter;
+            const ideasWithContext = ideasArray.map(idea => ({
+                ...idea,
+                persona: persona,
+                id: `idea-${ideaCounter++}`
+            }));
+            allParsedIdeas.push(...ideasWithContext);
+
+            renderIdeationBlock(persona, reconstructedMarkdown, startingIdeaCounter);
 
         } catch (error) {
             console.error("Error in runDivergentIdeation for persona " + persona.Role, error);
+            console.error("Failed to parse or process the following text:", rawResponseText);
             const errorCard = document.createElement('div');
             errorCard.className = 'agent-card bg-white p-4 rounded-lg border';
-            errorCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.Role)}</h3><p class="text-red-500 p-2 text-center">Error generating ideas.</p>`;
+            errorCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.Role)}</h3><p class="text-red-500 p-2 text-center">Error parsing ideas.</p>`;
             ideasContainer.appendChild(errorCard);
         }
         await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
