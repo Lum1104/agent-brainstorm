@@ -50,7 +50,7 @@ const exportMdBtn = document.getElementById('export-md-btn');
 const modelSelect = document.getElementById('model-select');
 
 // --- GEMINI API HELPER ---
-async function callGemini(contents, generationConfig = {}, modelName = 'gemini-2.5-flash') {
+async function callGemini(contents, generationConfig = {}) {
     if (!genAI) {
         alert("Please set your Google API Key in the settings before proceeding.");
         throw new Error("API Key not set.");
