@@ -64,12 +64,16 @@
         .prose table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
+            /* Important for controlling cell widths */
         }
 
         .prose th,
         .prose td {
             border: 1px solid #d1d5db;
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 1rem;
+            word-wrap: break-word;
+            vertical-align: top;
         }
 
         .prose th {
@@ -82,6 +86,40 @@
             border-radius: 0.5rem;
             white-space: pre-wrap;
             word-wrap: break-word;
+        }
+
+        /* Styles for Collapsible Table Cells */
+        .collapsible-wrapper {
+            position: relative;
+        }
+
+        .collapsible-content {
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 4.5em;
+            /* Approx 3 lines of text */
+            /* Fade out effect for collapsed text */
+            -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+            mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+        }
+
+        .toggle-expand {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #3b82f6;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            display: inline-block;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .toggle-expand:hover {
+            text-decoration: underline;
         }
 
         /* Styles for Mermaid Chart and Controls */
@@ -138,10 +176,280 @@
             max-width: 40rem;
             box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
         }
+
+        /* Set specific widths for the evaluation table columns */
+        #evaluation-container table th:nth-child(1),
+        #evaluation-container table td:nth-child(1) {
+            width: 18%;
+        }
+
+        #evaluation-container table th:nth-child(2),
+        #evaluation-container table td:nth-child(2) {
+            width: 32%;
+        }
+
+        /* Make score columns narrower */
+        #evaluation-container table th:nth-child(3),
+        #evaluation-container table td:nth-child(3) {
+            width: 7%;
+            text-align: center;
+        }
+
+        #evaluation-container table th:nth-child(4),
+        #evaluation-container table td:nth-child(4),
+        #evaluation-container table th:nth-child(5),
+        #evaluation-container table td:nth-child(5) {
+            width: 10%;
+            text-align: center;
+        }
+
+        #evaluation-container table th:nth-child(6),
+        #evaluation-container table td:nth-child(6) {
+            width: 26%;
+        }
+
+        .progress-sidebar {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            padding: 1.5rem 1rem;
+            min-width: 80px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 0.5rem;
+            margin: 0.5rem 0;
+            border-radius: 15px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-step::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.1),
+                    transparent);
+            transform: rotate(45deg);
+            transition: transform 0.6s;
+            opacity: 0;
+        }
+
+        .progress-step:hover::before {
+            transform: rotate(45deg) translate(50%, 50%);
+            opacity: 1;
+        }
+
+        .progress-step.completed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .progress-step.completed::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.4),
+                    transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        .progress-step.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+            transform: scale(1.05);
+        }
+
+        .progress-step.active::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.6),
+                    transparent);
+            animation: shimmer 1.5s infinite;
+        }
+
+        .progress-step.pending {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        .step-number {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .step-number::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 50%;
+            padding: 2px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: xor;
+            -webkit-mask-composite: xor;
+            opacity: 0;
+            animation: rotateBorder 3s linear infinite;
+        }
+
+        .step-number.completed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .step-number.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
+        }
+
+        .step-number.active::before {
+            opacity: 1;
+        }
+
+        .step-number.pending {
+            background: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .step-title {
+            font-size: 0.75rem;
+            line-height: 1.1;
+            text-align: center;
+            font-weight: 500;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 连接线 */
+        .progress-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            bottom: -0.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 1rem;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+        }
+
+        .progress-step.completed:not(:last-child)::after {
+            background: linear-gradient(to bottom, #10b981, rgba(16, 185, 129, 0.3));
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        @keyframes shimmer {
+            0% {
+                left: -100%;
+            }
+
+            100% {
+                left: 100%;
+            }
+        }
+
+        @keyframes rotateBorder {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 在小屏幕上隐藏进度条 */
+        @media (max-width: 1520px) and (min-width: 1101px) {
+            .step-title {
+                display: none;
+            }
+
+            .progress-sidebar {
+                min-width: 60px;
+                padding: 1rem 0.5rem;
+            }
+
+            .progress-step {
+                padding: 0.75rem 0.25rem;
+            }
+        }
+
+        /* 在小屏幕上完全隐藏进度条 */
+        @media (max-width: 1000px) {
+            .progress-sidebar {
+                display: none;
+            }
+        }
     </style>
 </head>
 
 <body class="bg-gray-50 text-gray-800">
+    <!-- Progress Sidebar -->
+    <div class="progress-sidebar">
+        <div class="progress-step pending" data-stage="1">
+            <div class="step-number pending">1</div>
+            <div class="step-title">Assemble Team</div>
+        </div>
+        <div class="progress-step pending" data-stage="2">
+            <div class="step-number pending">2</div>
+            <div class="step-title">Divergent Thinking</div>
+        </div>
+        <div class="progress-step pending" data-stage="3">
+            <div class="step-number pending">3</div>
+            <div class="step-title">Rank & Analyze</div>
+        </div>
+        <div class="progress-step pending" data-stage="4">
+            <div class="step-number pending">4</div>
+            <div class="step-title">Final Plan</div>
+        </div>
+    </div>
 
     <div class="container mx-auto p-4 md:p-8">
         <header class="text-center mb-8">
@@ -241,19 +549,26 @@
         </div>
 
         <div id="stage-3-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
-            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 3 & 4: Convergent Evaluation</h2>
-            <p class="text-gray-600 mb-4">A Critic Agent will now analyze, cluster, and evaluate the ideas you selected
-                to identify the most promising concepts.</p>
-            <div id="convergent-loader" class="flex flex-col items-center mt-6">
-                <div class="loader"></div>
-                <p class="mt-2 text-gray-600">Critic agent is analyzing and ranking ideas...</p>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700 stage-title flex-grow">Stage 3: Convergent Evaluation
+                </h2>
             </div>
-            <div id="evaluation-container" class="prose max-w-none mt-6"></div>
-            <div id="top-ideas-container" class="mt-8"></div>
+            <div id="evaluation-content-wrapper">
+                <p class="text-gray-600 mb-4">A Critic Agent will now analyze, cluster, and evaluate the ideas you
+                    selected
+                    to identify the most promising concepts.</p>
+                <div id="convergent-loader" class="flex flex-col items-center mt-6">
+                    <div class="loader"></div>
+                    <p class="mt-2 text-gray-600">Critic agent is analyzing and ranking ideas...</p>
+                </div>
+                <div id="evaluation-controls" class="hidden items-center gap-4 mb-4"></div>
+                <div id="evaluation-container" class="prose max-w-none mt-6"></div>
+                <div id="top-ideas-container" class="mt-8"></div>
+            </div>
         </div>
 
         <div id="stage-5-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
-            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 5: Final Document Generation</h2>
+            <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 4: Final Document Generation</h2>
             <p id="stage-5-subtitle" class="text-gray-600 mb-4">An expert agent is generating the final document for the
                 selected idea.</p>
             <div id="planning-loader" class="flex flex-col items-center mt-6">
@@ -265,7 +580,7 @@
                 class="hidden mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row gap-4 justify-center">
                 <button id="export-md-btn"
                     class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition-all duration-200">
-                    Export to .md
+                    Save all ideas and plans as Markdown.
                 </button>
             </div>
         </div>
@@ -288,6 +603,46 @@
 
         mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
+        function updateProgress(currentStage) {
+            const progressSteps = document.querySelectorAll('.progress-step');
+
+            progressSteps.forEach((step, index) => {
+                const stepNumber = index + 1;
+                const stepEl = step.querySelector('.step-number');
+
+                // 清除所有状态类
+                step.classList.remove('completed', 'active', 'pending');
+                stepEl.classList.remove('completed', 'active', 'pending');
+
+                if (stepNumber < currentStage) {
+                    // 已完成的阶段
+                    step.classList.add('completed');
+                    stepEl.classList.add('completed');
+                    stepEl.textContent = '✓';
+                } else if (stepNumber === currentStage) {
+                    // 当前阶段
+                    step.classList.add('active');
+                    stepEl.classList.add('active');
+                    stepEl.textContent = stepNumber;
+                } else {
+                    // 待完成的阶段
+                    step.classList.add('pending');
+                    stepEl.classList.add('pending');
+                    stepEl.textContent = stepNumber;
+                }
+            });
+        }
+
+        document.querySelectorAll('.progress-step').forEach(step => {
+            step.addEventListener('click', () => {
+                const stage = parseInt(step.dataset.stage);
+                const targetContainer = document.getElementById(`stage-${stage === 1 ? '1' : stage === 2 ? '2' : stage === 3 ? '3' : '5'}-container`);
+                if (targetContainer && !targetContainer.classList.contains('hidden')) {
+                    targetContainer.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
         // --- PROMPT TEMPLATES ---
         const prompts = {
             persona: {
@@ -297,12 +652,12 @@
             rag_summary: `You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text to be used as context for a brainstorming session. Focus on key concepts, definitions, and the current state of the topic.\nSearch Results:\n---\n{search_results}\n---\n\nProvide your summary in a single, dense paragraph.`,
             pdf: `You are a Research Analyst. Your task is to summarize the following PDF content to provide context for brainstorming:\n\n{pdf_content}\n\nProvide your summary in dense paragraph.`,
             ideation: {
-                project: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to brainstorm 5 innovative and unconventional project ideas or features about '{topic}'. Think from first principles, drawing on your unique backstory and the provided context: {combined_context}\n\nYour primary goal is novelty and quantity. Do NOT critique or elaborate on the ideas.\n\nFor each of the 5 ideas, provide the following in Markdown:\n- **Idea:** A concise name for the project/feature.\n- **Target Audience:** The specific user or group who would benefit most.\n- **Problem Solved:** The core pain point this idea addresses.\n- **My Rationale:** A single sentence on why your unique persona suggests this.`,
-                research_paper: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to formulate 5 novel research ideas related to '{topic}'. Aim for ideas with high potential for scholarly contribution. Use the provided context: {combined_context}\n\nDo not critique the feasibility of the ideas yet.\n\nFor each of the 5 ideas, provide the following in Markdown:\n- **Research Question:** The core question the study would seek to answer.\n- **Potential Methodology:** A brief suggestion of the research approach (e.g., \"Quantitative Analysis,\" \"Qualitative Case Study,\" \"Algorithm Development\").\n- **Potential Contribution:** The specific gap in knowledge this research could fill.\n- **My Rationale:** A single sentence on why your unique scholarly perspective makes this question compelling.`
+                project: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to brainstorm 5 innovative and unconventional project ideas or features about '{topic}'. Think from first principles, drawing on your unique backstory and the provided context: {combined_context}\n\nYour primary goal is novelty and quantity. Do NOT critique or elaborate on the ideas.\n\nFor each of the 5 ideas, provide the following STRICTLY in Markdown:\n- **Idea:** A concise name for the project/feature.\n- **Target Audience:** The specific user or group who would benefit most.\n- **Problem Solved:** The core pain point this idea addresses.\n- **My Rationale:** A single sentence on why your unique persona suggests this.`,
+                research_paper: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to formulate 5 novel research ideas related to '{topic}'. Aim for ideas with high potential for scholarly contribution. Use the provided context: {combined_context}\n\nDo not critique the feasibility of the ideas yet.\n\nFor each of the 5 ideas, provide the following STRICTLY in Markdown:\n- **Research Question:** The core question the study would seek to answer.\n- **Potential Methodology:** A brief suggestion of the research approach (e.g., \"Quantitative Analysis,\" \"Qualitative Case Study,\" \"Algorithm Development\").\n- **Potential Contribution:** The specific gap in knowledge this research could fill.\n- **My Rationale:** A single sentence on why your unique scholarly perspective makes this question compelling.`
             },
             evaluation: {
                 project: `You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. De-duplicate them and group similar concepts into project themes.\n2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 project ideas:'. Then, provide a JSON array of objects for the top 3 projects you recommend. Each object needs 'title' and 'description' keys. This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`,
-                research_paper: `You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. Group similar concepts into distinct research avenues.\n2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty/Originality (1-10)', 'Methodological Soundness (1-10)', 'Potential Contribution (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 research ideas:'. Then, provide a JSON array of objects for the top 3 research questions you recommend. Each object needs 'title' (a concise research question) and 'description' (a brief explanation of the study). This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`
+                research_paper: `You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. Group similar concepts into distinct research avenues.\n2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty (1-10)', 'Methodology (1-10)', 'Contribution (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 research ideas:'. Then, provide a JSON array of objects for the top 3 research questions you recommend. Each object needs 'title' (a concise research question) and 'description' (a brief explanation of the study). This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`
             },
             planning: {
                 project: `You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title and description.\n\n**Selected Idea:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease structure your response in Markdown with the following sections:\n\n### 1. Project Overview & Business Case\n* **Inferred Business Domain:** Based on the title and description, first identify the specific business domain or industry this project belongs to (e.g., FinTech - Algorithmic Trading, Healthcare - Diagnostic AI, E-commerce - Recommendation Systems).\n* **Problem Statement & Opportunity:** Briefly introduce the business problem the project solves or the market opportunity it captures.\n* **Project Goals & Objectives:** Clearly articulate the primary business goal and list 2-3 specific, measurable (SMART) objectives for the project.\n\n### 2. Scope, Technology & Execution Plan\n* **Project Approach:** Propose a primary project management methodology (e.g., Agile-Scrum, Kanban, Waterfall) and justify its selection.\n* **Core Features & Requirements:**\n    * **In-Scope Features:** List the high-level features or epics that define the core functionality of the final product.\n    * **Proposed Technology Stack:** Recommend a specific technology stack (e.g., Frontend, Backend, Database, AI/ML Libraries, Cloud Infrastructure).\n* **Quality Assurance & Success Metrics:**\n    * **Testing Strategy:** Outline the methods for ensuring quality (e.g., unit testing, integration testing, user acceptance testing).\n    * **Key Performance Indicators (KPIs):** Define clear, quantifiable metrics to evaluate the project's success post-launch (e.g., user engagement, revenue increase, cost reduction, system performance).\n\n### 3. Expected Deliverables & Business Impact\n* **Key Project Deliverables:** List the tangible outputs the project will produce (e.g., Deployed production API, interactive user dashboard, technical documentation).\n* **Anticipated Business Impact:** Explain how this project, if successful, would contribute to the business. What specific strategic, financial, or operational value would it deliver?\n* **Initial Resource Plan:** Estimate the core team roles required to execute the project (e.g., Project Manager, AI/ML Engineer, Backend Developer, UI/UX Designer, QA Analyst).\n\n### 4. Phased Project Roadmap\n* Provide a high-level project timeline, broken down into distinct phases with estimated durations in weeks.\n\nFinally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. The flowchart should break down the project phases into more granular tasks and milestones. For example:\n\`\`\`mermaid\ngraph TD;\n    subgraph "Phase 1: Discovery & Planning (3 Weeks)"\n        A["Kick-off & Stakeholder Alignment"] --> B["Market Research & Competitive Analysis"];\n        B --> C["Finalize Requirements & Define KPIs"];\n        C --> D["Develop Detailed Project Roadmap & Resource Plan"];\n    end\n    \n    subgraph "Phase 2: Design & Prototyping (4 Weeks)"\n        E["Architectural Design & Tech Stack Finalization"] --> F["Data Sourcing & Preparation"];\n        F --> G["Wireframing & UI/UX Design"];\n        G --> H["Build Interactive Prototype & Conduct User Feedback Session"];\n    end\n    \n    subgraph "Phase 3: Development & QA (8 Weeks)"\n        I["Sprint 1-3: Core Feature Development (Backend & AI Model)"] --> J["Sprint 4-5: Frontend Development & API Integration"];\n        J --> K["Continuous Integration & Unit/Integration Testing"];\n        K --> L["User Acceptance Testing (UAT) & Bug Fixing"];\n    end\n    \n    subgraph "Phase 4: Deployment & Launch (2 Weeks)"\n        M["Prepare Production Environment"] --> N["Deploy Application & Monitor Stability"];\n        N --> O["Official Launch & Internal Handoff to Operations Team"];\n    end\n\n    D --> E;\n    H --> I;\n    L --> M;\n    O --> P["Phase 5: Post-Launch Monitoring & Iteration"];\n\`\`\`\n`,
@@ -333,9 +688,11 @@
         const stage3Container = document.getElementById('stage-3-container');
         const convergentLoader = document.getElementById('convergent-loader');
         const evaluationContainer = document.getElementById('evaluation-container');
+        const evaluationControls = document.getElementById('evaluation-controls');
+        const evaluationContentWrapper = document.getElementById('evaluation-content-wrapper');
         const topIdeasContainer = document.getElementById('top-ideas-container');
-        const stage5Container = document.getElementById('stage-5-container');
-        const stage5Subtitle = document.getElementById('stage-5-subtitle');
+        const stage4Container = document.getElementById('stage-5-container');
+        const stage4Subtitle = document.getElementById('stage-5-subtitle');
         const planningLoader = document.getElementById('planning-loader');
         const planningContainer = document.getElementById('planning-container');
         const fullscreenModal = document.getElementById('fullscreen-modal');
@@ -483,9 +840,10 @@
             brainstormType = brainstormTypeInput.value;
 
             // --- Reset UI for a new run ---
-            [stageRagContainer, stage2Container, stage3Container, stage5Container, shareExportContainer].forEach(el => el.classList.add('hidden'));
+            [stageRagContainer, stage2Container, stage3Container, stage4Container, shareExportContainer].forEach(el => el.classList.add('hidden'));
             [personaContainer, ragSummaryContainer, ideasContainer, evaluationContainer, topIdeasContainer, planningContainer].forEach(el => el.innerHTML = '');
             toConvergentBtn.classList.add('hidden');
+            evaluationControls.classList.add('hidden');
             allParsedIdeas = [];
             startBtn.disabled = true;
 
@@ -495,6 +853,8 @@
                 type: brainstormType,
                 pdfStatus: pdfStatus.textContent
             };
+
+            updateProgress(1);
 
             const combinedContext = await runRagAndCombineContext(topic, pdfTextContext);
             brainstormState.combinedContext = combinedContext;
@@ -619,6 +979,7 @@
 
 
         async function runDivergentIdeation(topic, personas, combinedContext) {
+            updateProgress(2);
             showLoader(divergentLoader);
             ideasContainer.innerHTML = '';
             allParsedIdeas = [];
@@ -668,6 +1029,7 @@
 
             if (matches.length === 0) {
                 personaIdeasContainer.innerHTML += `<p class="text-gray-500 italic">This agent did not generate any ideas in the correct format.</p>`;
+                console.log(ideasText); // Debugging output
             }
 
             for (const match of matches) {
@@ -721,6 +1083,7 @@
         }
 
         toConvergentBtn.addEventListener('click', () => {
+            updateProgress(3);
             const selectedIdeaIds = Array.from(ideasContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.id);
             if (selectedIdeaIds.length === 0) {
                 alert("Please select at least one idea to proceed.");
@@ -752,7 +1115,8 @@
             showLoader(convergentLoader);
             evaluationContainer.innerHTML = '';
             topIdeasContainer.innerHTML = '';
-            brainstormState.rawIdeasForEvaluation = rawIdeasString; // Save for restoration
+            evaluationControls.classList.add('hidden');
+            brainstormState.rawIdeasForEvaluation = rawIdeasString;
 
             const prompt = prompts.evaluation[brainstormType].replace('{raw_ideas}', rawIdeasString);
 
@@ -776,12 +1140,97 @@
             if (jsonMatch && jsonMatch[1]) {
                 try {
                     topIdeas = JSON.parse(jsonMatch[1]);
-                    evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').trim();
+                    // replace the ' (1-10)' text with empty
+                    evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').replace(/\s*\(\d+-\d+\)/g, '').trim();
                 } catch (e) {
                     console.error("Failed to parse top ideas JSON:", e);
                 }
             }
-            evaluationContainer.innerHTML = marked.parse(evaluationMarkdown);
+
+            const parsedHTML = marked.parse(evaluationMarkdown);
+
+            const tableRegex = /(<table[\s\S]*?<\/table>)/gi;
+            const parts = parsedHTML.split(tableRegex);
+
+            let finalHTML = '';
+            let hasCollapsibleContent = false;
+
+            for (let i = 0; i < parts.length; i++) {
+                if (parts[i].match(tableRegex)) {
+                    finalHTML += `
+                        <div class="mb-4 flex flex-wrap gap-2">
+                            <button class="table-toggle-btn text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
+                                Show the Evaluation Table
+                            </button>
+                            <button class="table-expand-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
+                                Expand All
+                            </button>
+                            <button class="table-collapse-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
+                                Collapse All
+                            </button>
+                        </div>
+                        <div class="evaluation-table-wrapper hidden">${parts[i]}</div>
+                    `;
+                } else {
+                    finalHTML += parts[i];
+                }
+            }
+
+            evaluationContainer.innerHTML = finalHTML;
+
+            const tableToggleBtns = evaluationContainer.querySelectorAll('.table-toggle-btn');
+            const tableExpandAllBtns = evaluationContainer.querySelectorAll('.table-expand-all-btn');
+            const tableCollapseAllBtns = evaluationContainer.querySelectorAll('.table-collapse-all-btn');
+
+            tableToggleBtns.forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    const tableWrapper = btn.parentElement.nextElementSibling;
+                    const expandBtn = tableExpandAllBtns[index];
+                    const collapseBtn = tableCollapseAllBtns[index];
+
+                    if (tableWrapper && tableWrapper.classList.contains('evaluation-table-wrapper')) {
+                        const isHidden = tableWrapper.classList.toggle('hidden');
+                        btn.textContent = isHidden ? 'Show the Evaluation Table' : 'Hide the Evaluation Table';
+
+                        if (isHidden) {
+                            expandBtn.style.display = 'none';
+                            collapseBtn.style.display = 'none';
+                        } else {
+                            const hasCollapsible = tableWrapper.querySelectorAll('.collapsible-content').length > 0;
+                            if (hasCollapsible) {
+                                expandBtn.style.display = 'inline-block';
+                                collapseBtn.style.display = 'inline-block';
+                            }
+                        }
+                    }
+                });
+            });
+
+            tableExpandAllBtns.forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    const tableWrapper = btn.parentElement.nextElementSibling;
+                    if (tableWrapper) {
+                        tableWrapper.querySelectorAll('.collapsible-content').forEach(content => {
+                            content.classList.remove('collapsed');
+                            content.nextElementSibling.textContent = 'Show less';
+                        });
+                    }
+                });
+            });
+
+            tableCollapseAllBtns.forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    const tableWrapper = btn.parentElement.nextElementSibling;
+                    if (tableWrapper) {
+                        tableWrapper.querySelectorAll('.collapsible-content').forEach(content => {
+                            content.classList.add('collapsed');
+                            content.nextElementSibling.textContent = 'Read more';
+                        });
+                    }
+                });
+            });
+
+            makeTableCellsCollapsible();
 
             if (topIdeas.length > 0) {
                 const header = document.createElement('h3');
@@ -801,10 +1250,54 @@
             }
         }
 
+        function makeTableCellsCollapsible() {
+            const cells = evaluationContainer.querySelectorAll('table td');
+            const CHARACTER_THRESHOLD = 50; // Collapse if content is longer than this
+            let collapsibleFound = false;
+
+            cells.forEach(cell => {
+                if (cell.textContent.length > CHARACTER_THRESHOLD) {
+                    collapsibleFound = true;
+                    const originalContent = cell.innerHTML;
+                    cell.innerHTML = `
+                        <div class="collapsible-wrapper">
+                            <div class="collapsible-content collapsed">${originalContent}</div>
+                            <button class="toggle-expand">Read more</button>
+                        </div>
+                    `;
+                }
+            });
+
+            if (collapsibleFound) {
+                evaluationControls.classList.remove('hidden');
+                evaluationControls.classList.add('flex');
+            } else {
+                evaluationControls.classList.add('hidden');
+            }
+        }
+
+        evaluationContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('toggle-expand')) {
+                const button = e.target;
+                const contentWrapper = button.previousElementSibling;
+                contentWrapper.classList.toggle('collapsed');
+                button.textContent = contentWrapper.classList.contains('collapsed') ? 'Read more' : 'Show less';
+            }
+        });
+
+
+        collapseAllBtn.addEventListener('click', () => {
+            evaluationContainer.querySelectorAll('.collapsible-content').forEach(content => {
+                content.classList.add('collapsed');
+                content.nextElementSibling.textContent = 'Read more';
+            });
+        });
+
         async function runImplementationPlanning(idea) {
-            stage5Container.classList.remove('hidden');
-            stage5Subtitle.textContent = `The AI expert has generated a high-level ${brainstormType === 'project' ? 'implementation plan' : 'research outline'} for the selected idea.`;
-            window.scrollTo({ top: stage5Container.offsetTop, behavior: 'smooth' });
+            updateProgress(4);
+            stage4Container.classList.remove('hidden');
+            stage4Subtitle.textContent = `The AI expert has generated a high-level ${brainstormType === 'project' ? 'implementation plan' : 'research outline'} for the selected idea.`;
+            window.scrollTo({ top: stage4Container.offsetTop, behavior: 'smooth' });
             showLoader(planningLoader);
             planningContainer.innerHTML = '';
 
@@ -910,13 +1403,13 @@
                 }
             }
             if (brainstormState.evaluationOutput) {
-                md.push('\n## Stage 3 & 4: Convergent Evaluation');
+                md.push('\n## Stage 3: Convergent Evaluation');
                 // Remove the JSON block from the evaluation for a cleaner md export
                 const cleanEvaluation = brainstormState.evaluationOutput.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
                 md.push(cleanEvaluation);
             }
             if (brainstormState.finalPlanOutput) {
-                md.push('\n## Stage 5: Final Plan');
+                md.push('\n## Stage 4: Final Plan');
                 md.push(brainstormState.finalPlanOutput);
             }
 
@@ -933,7 +1426,6 @@
             document.body.removeChild(element);
         }
 
-        // Fullscreen modal close logic
         closeFullscreenBtn.addEventListener('click', () => {
             fullscreenModal.classList.add('hidden');
             fullscreenModalContent.innerHTML = '';
