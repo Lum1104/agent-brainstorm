@@ -271,17 +271,32 @@ async function runPreviewAgent(topic, combinedContext) {
     const prompt = prompts.persona[brainstormType]
         .replace('{topic}', sanitizeHTML(topic))
         .replace('{combined_context}', combinedContext);
+
+    // Define a variable to hold the raw text for logging in case of an error
+    let rawResponseText = "";
+
     try {
         const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
-        const personaData = JSON.parse(response.candidates[0].content.parts[0].text);
+        rawResponseText = response.candidates[0].content.parts[0].text;
+
+        const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
+        const match = rawResponseText.match(jsonRegex);
+
+        const jsonString = match ? match[1] : rawResponseText;
+
+        const personaData = JSON.parse(jsonString);
+
         hideLoader(previewAgentLoader);
         stage2Container.classList.remove('hidden');
         personaData.personas.forEach(p => renderPersonaCard(p));
         return personaData.personas;
+
     } catch (error) {
         hideLoader(previewAgentLoader);
-        personaContainer.innerHTML = `<p class="text-red-500 text-center col-span-full">Error: Could not assemble the agent team.</p>`;
+        personaContainer.innerHTML = `<p class="text-red-500 text-center col-span-full">Error: Could not parse the agent team data.</p>`;
         console.error("Error in runPreviewAgent:", error);
+        // Log the actual text that failed to parse for easier debugging
+        console.error("Failed to parse the following text:", rawResponseText);
         return null;
     }
 }
@@ -753,6 +768,7 @@ async function renderImplementationPlan(planText) {
                 document.body.style.overflow = 'hidden';
             };
         } catch (e) {
+            console.error("Error rendering Mermaid chart:", e);
             mermaidDiv.innerHTML = `<p class="text-red-500 font-bold">Mermaid Chart Error:</p><pre>${e.message}</pre><pre>${sanitizeHTML(mermaidCode)}</pre>`;
         }
     }
