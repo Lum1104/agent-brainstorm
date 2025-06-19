@@ -1,5 +1,9 @@
+import { prompts } from "./prompts.js";
+import { GoogleGenAI } from "https://cdn.jsdelivr.net/npm/@google/genai@1.5.1/+esm";
+
 // --- CONFIGURATION & STATE ---
 let userApiKey = null;
+let genAI = null; // Instance of the GoogleGenAI SDK
 let brainstormType = 'project';
 let allParsedIdeas = [];
 let chartZoomLevel = 1.0;
@@ -8,6 +12,94 @@ let brainstormState = {}; // Central state object for sharing
 
 mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
 
+
+// --- DOM ELEMENT REFERENCES ---
+const apiKeyInput = document.getElementById('api-key-input');
+const saveKeyBtn = document.getElementById('save-key-btn');
+const keyStatus = document.getElementById('key-status');
+const brainstormForm = document.getElementById('brainstorm-form');
+const brainstormTypeInput = document.getElementById('brainstorm-type');
+const topicInput = document.getElementById('topic-input');
+const pdfUploadInput = document.getElementById('pdf-upload');
+const pdfStatus = document.getElementById('pdf-status');
+const startBtn = document.getElementById('start-btn');
+const previewAgentLoader = document.getElementById('preview-agent-loader');
+const personaContainer = document.getElementById('persona-container');
+const stageRagContainer = document.getElementById('stage-rag-container');
+const ragLoader = document.getElementById('rag-loader');
+const ragLoaderText = document.getElementById('rag-loader-text');
+const ragSummaryContainer = document.getElementById('rag-summary-container');
+const stage2Container = document.getElementById('stage-2-container');
+const divergentLoader = document.getElementById('divergent-loader');
+const ideasContainer = document.getElementById('ideas-container');
+const toConvergentBtn = document.getElementById('to-convergent-btn');
+const stage3Container = document.getElementById('stage-3-container');
+const convergentLoader = document.getElementById('convergent-loader');
+const evaluationContainer = document.getElementById('evaluation-container');
+const evaluationControls = document.getElementById('evaluation-controls');
+const topIdeasContainer = document.getElementById('top-ideas-container');
+const stage4Container = document.getElementById('stage-4-container');
+const stage4Subtitle = document.getElementById('stage-4-subtitle');
+const planningLoader = document.getElementById('planning-loader');
+const planningContainer = document.getElementById('planning-container');
+const fullscreenModal = document.getElementById('fullscreen-modal');
+const fullscreenModalContent = document.getElementById('fullscreen-modal-content');
+const closeFullscreenBtn = document.getElementById('close-fullscreen');
+const shareExportContainer = document.getElementById('share-export-container');
+const exportMdBtn = document.getElementById('export-md-btn');
+const modelSelect = document.getElementById('model-select');
+
+// --- GEMINI API HELPER ---
+async function callGemini(contents, generationConfig = {}, modelName = 'gemini-2.5-flash') {
+    if (!genAI) {
+        alert("Please set your Google API Key in the settings before proceeding.");
+        throw new Error("API Key not set.");
+    }
+
+    const modelName = modelSelect.value;
+
+    // Add thinking mode config for supported models
+    if (modelName.includes('gemini-2.5')) {
+        generationConfig.thinkingConfig = { thinkingBudget: -1 };
+    }
+
+    try {
+        // Get the generative model from the SDK
+        const response = await genAI.models.generateContent({
+            model: modelName,
+            contents: contents,
+            config: generationConfig
+        });
+
+
+        // The SDK response object (`response`) is structured similarly to the raw API response,
+        // making it a compatible replacement for the rest of the application logic.
+
+        // Handle potential errors or empty responses
+        if (!response) {
+            throw new Error("Received an empty response from the Gemini API.");
+        }
+
+        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content) {
+            return response;
+        } else {
+            console.warn("API response missing candidates or content:", response);
+            if (response.promptFeedback?.blockReason) {
+                throw new Error(`Request was blocked due to: ${response.promptFeedback.blockReason}`);
+            }
+            if (response.candidates && response.candidates[0]?.finishReason === 'SAFETY') {
+                throw new Error("Content blocked by safety settings. Please try a different topic.");
+            }
+            throw new Error("Received an invalid or empty response from the Gemini API.");
+        }
+    } catch (error) {
+        console.error("Error in callGemini function:", error);
+        alert(`An error occurred while communicating with the API. Please check the console for details. Error: ${error.message}`);
+        throw error;
+    }
+}
+
+// --- UI & WORKFLOW LOGIC ---
 function updateProgress(currentStage) {
     const progressSteps = document.querySelectorAll('.progress-step');
 
@@ -34,116 +126,6 @@ function updateProgress(currentStage) {
     });
 }
 
-document.querySelectorAll('.progress-step').forEach(step => {
-    step.addEventListener('click', () => {
-        const stage = parseInt(step.dataset.stage);
-        const targetContainer = document.getElementById(`stage-${stage === 1 ? '1' : stage === 2 ? '2' : stage === 3 ? '3' : '5'}-container`);
-        if (targetContainer && !targetContainer.classList.contains('hidden')) {
-            targetContainer.scrollIntoView({ behavior: 'smooth' });
-        }
-    });
-});
-
-// --- PROMPT TEMPLATES ---
-const prompts = {
-    persona: {
-        project: `You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas (e.g., Product Manager, Lead Engineer, etc). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`,
-        research_paper: `You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas (e.g., Methodology Expert, etc). For each, provide their Role, Goal, and Backstory.\n\nUse this combined context from a web search and a user-provided document:\n{combined_context}`
-    },
-    rag_summary: `You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text to be used as context for a brainstorming session. Focus on key concepts, definitions, and the current state of the topic.\nSearch Results:\n---\n{search_results}\n---\n\nProvide your summary in a single, dense paragraph.`,
-    pdf: `You are a Research Analyst. Your task is to summarize the following PDF content to provide context for brainstorming:\n\n{pdf_content}\n\nProvide your summary in dense paragraph.`,
-    ideation: {
-        project: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to brainstorm 5 innovative and unconventional project ideas or features about '{topic}'. Think from first principles, drawing on your unique backstory and the provided context: {combined_context}\n\nYour primary goal is novelty and quantity. Do NOT critique or elaborate on the ideas.\n\nFor each of the 5 ideas, provide the following STRICTLY in Markdown:\n- **Idea:** A concise name for the project/feature.\n- **Target Audience:** The specific user or group who would benefit most.\n- **Problem Solved:** The core pain point this idea addresses.\n- **My Rationale:** A single sentence on why your unique persona suggests this.`,
-        research_paper: `You are:\n- Role: {role}\n- Backstory: {backstory}\n- Goal: {goal}\n\nAs a {role}, your task is to formulate 5 novel research ideas related to '{topic}'. Aim for ideas with high potential for scholarly contribution. Use the provided context: {combined_context}\n\nDo not critique the feasibility of the ideas yet.\n\nFor each of the 5 ideas, provide the following STRICTLY in Markdown:\n- **Research Question:** The core question the study would seek to answer.\n- **Potential Methodology:** A brief suggestion of the research approach (e.g., \"Quantitative Analysis,\" \"Qualitative Case Study,\" \"Algorithm Development\").\n- **Potential Contribution:** The specific gap in knowledge this research could fill.\n- **My Rationale:** A single sentence on why your unique scholarly perspective makes this question compelling.`
-    },
-    evaluation: {
-        project: `You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. De-duplicate them and group similar concepts into project themes.\n2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 project ideas:'. Then, provide a JSON array of objects for the top 3 projects you recommend. Each object needs 'title' (a concise project title) and 'description' (a DETAILED explanation of the project). This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`,
-        research_paper: `You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas. Your task is to perform a convergent analysis.\n\n1. **Synthesize & Cluster:** Read all the ideas. Group similar concepts into distinct research avenues.\n2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty (1-10)', 'Methodology (1-10)', 'Contribution (1-10)', 'Justification'.\n3. **Select Top 3:** After the table, explicitly state 'Here are the top 3 research ideas:'. Then, provide a JSON array of objects for the top 3 research questions you recommend. Each object needs 'title' (a concise research question) and 'description' (a DETAILED explanation of the study). This JSON array must be at the very end in a \`\`\`json code block.\n\nRaw Ideas:\n---\n{raw_ideas}\n---`
-    },
-    planning: {
-        project: `You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title and description.\n\n**Selected Idea:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease structure your response in Markdown with the following sections:\n\n### 1. Project Overview & Business Case\n* **Inferred Business Domain:** Based on the title and description, first identify the specific business domain or industry this project belongs to (e.g., FinTech - Algorithmic Trading, Healthcare - Diagnostic AI, E-commerce - Recommendation Systems).\n* **Problem Statement & Opportunity:** Briefly introduce the business problem the project solves or the market opportunity it captures.\n* **Project Goals & Objectives:** Clearly articulate the primary business goal and list 2-3 specific, measurable (SMART) objectives for the project.\n\n### 2. Scope, Technology & Execution Plan\n* **Project Approach:** Propose a primary project management methodology (e.g., Agile-Scrum, Kanban, Waterfall) and justify its selection.\n* **Core Features & Requirements:**\n    * **In-Scope Features:** List the high-level features or epics that define the core functionality of the final product.\n    * **Proposed Technology Stack:** Recommend a specific technology stack (e.g., Frontend, Backend, Database, AI/ML Libraries, Cloud Infrastructure).\n* **Quality Assurance & Success Metrics:**\n    * **Testing Strategy:** Outline the methods for ensuring quality (e.g., unit testing, integration testing, user acceptance testing).\n    * **Key Performance Indicators (KPIs):** Define clear, quantifiable metrics to evaluate the project's success post-launch (e.g., user engagement, revenue increase, cost reduction, system performance).\n\n### 3. Expected Deliverables & Business Impact\n* **Key Project Deliverables:** List the tangible outputs the project will produce (e.g., Deployed production API, interactive user dashboard, technical documentation).\n* **Anticipated Business Impact:** Explain how this project, if successful, would contribute to the business. What specific strategic, financial, or operational value would it deliver?\n* **Initial Resource Plan:** Estimate the core team roles required to execute the project (e.g., Project Manager, AI/ML Engineer, Backend Developer, UI/UX Designer, QA Analyst).\n\n### 4. Phased Project Roadmap\n* Provide a high-level project timeline, broken down into distinct phases with estimated durations in weeks.\n\nFinally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. The flowchart should break down the project phases into more granular tasks and milestones. For example:\n\`\`\`mermaid\ngraph TD;\n    subgraph "Phase 1: Discovery & Planning (3 Weeks)"\n        A["Kick-off & Stakeholder Alignment"] --> B["Market Research & Competitive Analysis"];\n        B --> C["Finalize Requirements & Define KPIs"];\n        C --> D["Develop Detailed Project Roadmap & Resource Plan"];\n    end\n    \n    subgraph "Phase 2: Design & Prototyping (4 Weeks)"\n        E["Architectural Design & Tech Stack Finalization"] --> F["Data Sourcing & Preparation"];\n        F --> G["Wireframing & UI/UX Design"];\n        G --> H["Build Interactive Prototype & Conduct User Feedback Session"];\n    end\n    \n    subgraph "Phase 3: Development & QA (8 Weeks)"\n        I["Sprint 1-3: Core Feature Development (Backend & AI Model)"] --> J["Sprint 4-5: Frontend Development & API Integration"];\n        J --> K["Continuous Integration & Unit/Integration Testing"];\n        K --> L["User Acceptance Testing (UAT) & Bug Fixing"];\n    end\n    \n    subgraph "Phase 4: Deployment & Launch (2 Weeks)"\n        M["Prepare Production Environment"] --> N["Deploy Application & Monitor Stability"];\n        N --> O["Official Launch & Internal Handoff to Operations Team"];\n    end\n\n    D --> E;\n    H --> I;\n    L --> M;\n    O --> P["Phase 5: Post-Launch Monitoring & Iteration"];\n\`\`\`\n`,
-        research_paper: `You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline based on the provided title and description.\n\n**Selected Research Question:**\n- **Title:** {title}\n- **Description:** {description}\n\nPlease structure your response in Markdown with the following sections:\n\n### 1. Inferred Research Field & Problem Statement\n* **Inferred Field:** Based on the title and description, first identify and state the specific academic field and sub-field this research belongs to (e.g., Computer Science - Natural Language Processing, Sociology - Urban Studies, Bioinformatics, etc.).\n* **Problem Context:** Briefly introduce the broader context of the problem.\n* **Core Challenge & Objectives:** Clearly articulate the central challenge the research addresses and list 2-3 specific, actionable objectives.\n\n### 2. Detailed Proposed Methodology\n* **Research Design:** Propose a primary research design appropriate for the inferred field (e.g., Experimental Study, Quantitative Survey, Qualitative Case Study, Algorithm Development & Benchmarking).\n\n* **Data & Procedures:**\n    * **Data Requirements:** Describe the type of data or corpus needed (e.g., a specific dataset, survey responses from a target demographic, textual corpus, patient data).\n    * **Execution Steps:** Provide a step-by-step plan for conducting the research, from data acquisition/preparation to execution.\n* **Analysis & Evaluation:**\n    * **Analysis Techniques:** Suggest specific methods for analyzing the results (e.g., statistical tests like regression analysis, ML model training protocols, thematic analysis of interviews).\n    * **Evaluation Metrics:** Define clear metrics to evaluate the success of the outcomes (e.g., model accuracy/F1-score, statistical significance (p-value), improvement over a baseline).\n\n### 3. Expected Outcomes & Contribution\n* **Hypothesized Outcomes:** Briefly state the expected findings or results of the research.\n* **Contribution to the Field:** Explain how this research, if successful, would contribute to the **inferred academic field**. What specific theoretical or practical advancements would it offer?\n\n### 4. Potential Target Publication Venues\n* Based on the **inferred field**, recommend 2-3 highly relevant and reputable academic conferences or journals for publication.\n\nFinally, create a Mermaid flowchart to visualize the research stages. Enclose it in a \`\`\`mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"]. The flowchart should reflect the detailed methodology, showing how different stages connect and how analysis can be multi-faceted. Here is a comprehensive example:\n\`\`\`mermaid\ngraph TD;\n    subgraph "Phase 1: Problem Definition & Literature Review"\n        A["Define Research Questions & Hypotheses"] --> B["Conduct Literature Review"];\n    end\n\n    subgraph "Phase 2: Data & Methodology"\n       C["Select Research Design (e.g., Algorithm Development)"] --> D["Data Acquisition & Preprocessing"];\n    end\n\n    subgraph "Phase 3: Model Development & Experimentation"\n        E["Develop Baseline & Proposed Models"] --> F["Experiment Execution: Run all models on the prepared dataset"];\n    end\n    \n    subgraph "Phase 4: Multi-Faceted Analysis & Evaluation"\n        F --> G["Performance Analysis: Compare model accuracy, F1-scores, etc."];\n        F --> H["Robustness Analysis: Test against noisy data or adversarial inputs"];\n        F --> I["Computational Cost Analysis: Measure inference time and memory usage"];\n        G --> J["Results Consolidation & Statistical Significance Testing"];\n        H --> J;\n        I --> J;\n    end\n\n    subgraph "Phase 5: Synthesis & Dissemination"\n        K["Synthesize All Findings & Draw Conclusions"] --> L["Write Manuscript"];\n        L --> M["Submit to Target Journal/Conference"];\n    end\n\n    B --> C;\n    D --> E;\n    J --> K;\n\`\`\``
-    }
-};
-
-// --- DOM ELEMENT REFERENCES ---
-const apiKeyInput = document.getElementById('api-key-input');
-const saveKeyBtn = document.getElementById('save-key-btn');
-const keyStatus = document.getElementById('key-status');
-const brainstormForm = document.getElementById('brainstorm-form');
-const brainstormTypeInput = document.getElementById('brainstorm-type');
-const topicInput = document.getElementById('topic-input');
-const pdfUploadInput = document.getElementById('pdf-upload');
-const pdfStatus = document.getElementById('pdf-status');
-const startBtn = document.getElementById('start-btn');
-const previewAgentLoader = document.getElementById('preview-agent-loader');
-const personaContainer = document.getElementById('persona-container');
-const stageRagContainer = document.getElementById('stage-rag-container');
-const ragLoader = document.getElementById('rag-loader');
-const ragLoaderText = document.getElementById('rag-loader-text');
-const ragSummaryContainer = document.getElementById('rag-summary-container');
-const stage2Container = document.getElementById('stage-2-container');
-const divergentLoader = document.getElementById('divergent-loader');
-const ideasContainer = document.getElementById('ideas-container');
-const toConvergentBtn = document.getElementById('to-convergent-btn');
-const stage3Container = document.getElementById('stage-3-container');
-const convergentLoader = document.getElementById('convergent-loader');
-const evaluationContainer = document.getElementById('evaluation-container');
-const evaluationControls = document.getElementById('evaluation-controls');
-const evaluationContentWrapper = document.getElementById('evaluation-content-wrapper');
-const topIdeasContainer = document.getElementById('top-ideas-container');
-const stage4Container = document.getElementById('stage-5-container');
-const stage4Subtitle = document.getElementById('stage-5-subtitle');
-const planningLoader = document.getElementById('planning-loader');
-const planningContainer = document.getElementById('planning-container');
-const fullscreenModal = document.getElementById('fullscreen-modal');
-const fullscreenModalContent = document.getElementById('fullscreen-modal-content');
-const closeFullscreenBtn = document.getElementById('close-fullscreen');
-const shareExportContainer = document.getElementById('share-export-container');
-const exportMdBtn = document.getElementById('export-md-btn');
-
-// --- GEMINI API HELPER ---
-async function callGemini(contents, generationConfig = {}) {
-    if (!userApiKey) {
-        alert("Please set your Google API Key in the settings before proceeding.");
-        throw new Error("API Key not set.");
-    }
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${userApiKey}`;
-    const payload = { contents, generationConfig };
-    try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) {
-            const errorBody = await response.text();
-            console.error("API Error Response Body:", errorBody);
-            throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
-        }
-        const result = await response.json();
-
-        if (result.error) {
-            console.error("API Error Response:", result.error);
-            throw new Error(`API returned an error: ${result.error.message}`);
-        }
-        if (result.candidates && result.candidates.length > 0 && result.candidates[0].content) {
-            return result;
-        } else {
-            console.warn("API response missing candidates or content:", result);
-            if (result.candidates && result.candidates[0]?.finishReason === 'SAFETY') {
-                throw new Error("Content blocked by safety settings. Please try a different topic.");
-            }
-            throw new Error("Received an invalid or empty response from the Gemini API.");
-        }
-    } catch (error) {
-        console.error("Error in callGemini function:", error);
-        alert(`An error occurred while communicating with the API. Please check the console for details. Error: ${error.message}`);
-        throw error;
-    }
-}
-
-// --- UI & WORKFLOW LOGIC ---
 function showLoader(loaderElement, text = null) {
     loaderElement.classList.remove('hidden');
     loaderElement.classList.add('flex');
@@ -169,17 +151,29 @@ window.addEventListener('load', () => {
     const storedApiKey = sessionStorage.getItem('gemini-api-key');
     if (storedApiKey) {
         userApiKey = storedApiKey;
+        genAI = new GoogleGenAI({ apiKey: userApiKey });
         keyStatus.textContent = "API Key restored from session.";
         keyStatus.classList.remove('hidden');
         startBtn.disabled = false;
         setTimeout(() => keyStatus.classList.add('hidden'), 3000);
     }
+
+    document.querySelectorAll('.progress-step').forEach(step => {
+        step.addEventListener('click', () => {
+            const stage = parseInt(step.dataset.stage);
+            const targetContainer = document.getElementById(`stage-${stage === 1 ? '1' : stage === 2 ? '2' : stage === 3 ? '3' : '4'}-container`);
+            if (targetContainer && !targetContainer.classList.contains('hidden')) {
+                targetContainer.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    });
 });
 
 saveKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) {
         userApiKey = key;
+        genAI = new GoogleGenAI({ apiKey: userApiKey });
         sessionStorage.setItem('gemini-api-key', key); // Save key to session storage
         keyStatus.textContent = "API Key has been set for this session.";
         keyStatus.classList.remove('hidden');
@@ -273,16 +267,12 @@ brainstormForm.addEventListener('submit', async (e) => {
 async function runPreviewAgent(topic, combinedContext) {
     showLoader(previewAgentLoader);
     personaContainer.innerHTML = '';
-    const schema = {
-        type: "OBJECT",
-        properties: { personas: { type: "ARRAY", items: { type: "OBJECT", properties: { role: { "type": "STRING" }, goal: { "type": "STRING" }, backstory: { "type": "STRING" } }, required: ["role", "goal", "backstory"] } } },
-        required: ["personas"]
-    };
+
     const prompt = prompts.persona[brainstormType]
         .replace('{topic}', sanitizeHTML(topic))
         .replace('{combined_context}', combinedContext);
     try {
-        const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }], { responseMimeType: "application/json", responseSchema: schema });
+        const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
         const personaData = JSON.parse(response.candidates[0].content.parts[0].text);
         hideLoader(previewAgentLoader);
         stage2Container.classList.remove('hidden');
@@ -824,4 +814,3 @@ closeFullscreenBtn.addEventListener('click', () => {
     fullscreenModalContent.innerHTML = '';
     document.body.style.overflow = 'auto';
 });
-

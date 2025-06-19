@@ -59,12 +59,32 @@
             <p class="text-gray-700 mt-2 mb-4">You can get your free API Key from <a
                     href="https://aistudio.google.com/apikey" target="_blank"
                     class="text-yellow-600 font-semibold hover:underline">Google AI Studio</a>.</p>
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input type="password" id="api-key-input" placeholder="Enter your Google API Key"
-                    class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none transition">
-                <button id="save-key-btn"
-                    class="bg-yellow-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-yellow-600 transition-all duration-200">Save
-                    Key</button>
+
+            <div class="flex flex-col md:flex-row gap-4 mt-4 items-end">
+
+                <div class="flex-grow w-full md:w-auto">
+                    <label for="api-key-input" class="block text-gray-700 font-semibold mb-2">Enter your Google API
+                        Key:</label>
+                    <div class="flex gap-2">
+                        <input type="password" id="api-key-input" placeholder="Enter your Google API Key"
+                            class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none transition">
+                        <button id="save-key-btn"
+                            class="bg-yellow-500 text-white font-semibold py-3 px-4 rounded-lg hover:bg-yellow-600 transition-all duration-200">Save
+                            Key</button>
+                    </div>
+                </div>
+
+                <div class="w-full md:w-auto md:min-w-[200px]">
+                    <label for="model-select" class="block text-gray-700 font-semibold mb-2">Select Model:</label>
+                    <select id="model-select"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:outline-none transition">
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Default)</option>
+                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast)</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Paid Tier)</option>
+                    </select>
+                </div>
+
             </div>
             <p id="key-status" class="text-sm mt-2 text-green-700 font-semibold hidden">API Key has been set for this
                 session.</p>
@@ -157,7 +177,7 @@
             </div>
         </div>
 
-        <div id="stage-5-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
+        <div id="stage-4-container" class="hidden bg-white p-6 rounded-xl shadow-md mb-8">
             <h2 class="text-xl font-semibold text-gray-700 stage-title">Stage 4: Final Document Generation</h2>
             <p id="stage-5-subtitle" class="text-gray-600 mb-4">An expert agent is generating the final document for the
                 selected idea.</p>
