@@ -304,7 +304,7 @@ async function runPreviewAgent(topic, combinedContext) {
 function renderPersonaCard(persona) {
     const card = document.createElement('div');
     card.className = 'agent-card bg-white p-4 rounded-lg border';
-    card.innerHTML = `<h3 class="font-bold text-blue-600">${sanitizeHTML(persona.role)}</h3><p class="text-sm text-gray-500 mt-1"><strong>Goal:</strong> ${sanitizeHTML(persona.goal)}</p><p class="text-sm text-gray-500 mt-1"><strong>Backstory:</strong> ${sanitizeHTML(persona.backstory)}</p>`;
+    card.innerHTML = `<h3 class="font-bold text-blue-600">${sanitizeHTML(persona.Role)}</h3><p class="text-sm text-gray-500 mt-1"><strong>Goal:</strong> ${sanitizeHTML(persona.Goal)}</p><p class="text-sm text-gray-500 mt-1"><strong>Backstory:</strong> ${sanitizeHTML(persona.Backstory)}</p>`;
     personaContainer.appendChild(card);
 }
 
@@ -396,24 +396,24 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
 
     for (const persona of personas) {
         const prompt = prompts.ideation[brainstormType]
-            .replace('{role}', persona.role)
-            .replace('{backstory}', persona.backstory)
-            .replace('{goal}', persona.goal)
+            .replace('{role}', persona.Role)
+            .replace('{backstory}', persona.Backstory)
+            .replace('{goal}', persona.Goal)
             .replace('{topic}', sanitizeHTML(topic))
             .replace('{combined_context}', combinedContext);
 
         try {
             const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
             const ideasText = response.candidates[0].content.parts[0].text;
-            brainstormState.ideationOutputs[persona.role] = ideasText; // Save for restoration
+            brainstormState.ideationOutputs[persona.Role] = ideasText; // Save for restoration
             renderIdeationBlock(persona, ideasText, ideaCounter);
             ideaCounter += 5; // approx
 
         } catch (error) {
-            console.error("Error in runDivergentIdeation for persona " + persona.role, error);
+            console.error("Error in runDivergentIdeation for persona " + persona.Role, error);
             const errorCard = document.createElement('div');
             errorCard.className = 'agent-card bg-white p-4 rounded-lg border';
-            errorCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3><p class="text-red-500 p-2 text-center">Error generating ideas.</p>`;
+            errorCard.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.Role)}</h3><p class="text-red-500 p-2 text-center">Error generating ideas.</p>`;
             ideasContainer.appendChild(errorCard);
         }
         await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY));
@@ -429,7 +429,7 @@ function renderIdeationBlock(persona, ideasText, ideaCounterStart) {
     let ideaCounter = ideaCounterStart;
     const personaIdeasContainer = document.createElement('div');
     personaIdeasContainer.className = 'agent-card bg-white p-4 rounded-lg border';
-    personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.role)}</h3>`;
+    personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.Role)}</h3>`;
 
     const ideaBlockRegex = /- \*\*(Idea|Research Question):\*\*([\s\S]*?)(?=- \*\*(Idea|Research Question):\*\*|$)/g;
     const matches = [...ideasText.matchAll(ideaBlockRegex)];
@@ -445,7 +445,7 @@ function renderIdeationBlock(persona, ideasText, ideaCounterStart) {
         const ideaTitleMatch = block.match(/- \*\*(?:Idea|Research Question):\*\*\s*(.*?)(?:\n|$)/);
 
         if (!ideaTitleMatch || !ideaTitleMatch[1].trim()) {
-            console.warn(`[${persona.role}] Skipped block due to missing title. Content:`, block);
+            console.warn(`[${persona.Role}] Skipped block due to missing title. Content:`, block);
             continue; // Skip this block if it doesn't even have a title
         }
         const title = ideaTitleMatch[1].trim();
@@ -469,7 +469,7 @@ function renderIdeationBlock(persona, ideasText, ideaCounterStart) {
         }
 
         const ideaId = `idea-${ideaCounter++}`;
-        allParsedIdeas.push({ role: persona.role, idea: ideaData, id: ideaId });
+        allParsedIdeas.push({ role: persona.Role, idea: ideaData, id: ideaId });
 
         const checkboxContainer = document.createElement('div');
         checkboxContainer.className = 'flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 border-b';
@@ -792,9 +792,9 @@ function generateMarkdownExport() {
     if (brainstormState.personas) {
         md.push('\n### Assembled Agent Team');
         brainstormState.personas.forEach(p => {
-            md.push(`- **${p.role}**`);
-            md.push(`  - **Goal:** ${p.goal}`);
-            md.push(`  - **Backstory:** ${p.backstory}`);
+            md.push(`- **${p.Role}**`);
+            md.push(`  - **Goal:** ${p.Goal}`);
+            md.push(`  - **Backstory:** ${p.Backstory}`);
         });
     }
     if (brainstormState.ideationOutputs) {
