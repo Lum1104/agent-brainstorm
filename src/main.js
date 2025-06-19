@@ -386,9 +386,10 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
     showLoader(divergentLoader);
     ideasContainer.innerHTML = '';
     allParsedIdeas = [];
+    brainstormState.ideationOutputs = {}; // This will now store the generated MARKDOWN.
+
     const RATE_LIMIT_DELAY = 1000;
     let ideaCounter = 0;
-    brainstormState.ideationOutputs = {}; // Store raw outputs
 
     for (const persona of personas) {
         const prompt = prompts.ideation[brainstormType]
@@ -404,13 +405,11 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
             const response = await callGemini([{ role: "user", parts: [{ text: prompt }] }]);
             rawResponseText = response.candidates[0].content.parts[0].text;
 
-
-            // 1. PARSE: Safely parse the JSON response from the model
+            // 1. PARSE JSON (Mandatory first step)
             const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
             const match = rawResponseText.match(jsonRegex);
             const jsonString = match ? match[1] : rawResponseText;
             const ideasData = JSON.parse(jsonString);
-
             const ideasKey = brainstormType === 'project' ? 'project_ideas' : 'research_ideas';
             const ideasArray = ideasData[ideasKey];
 
@@ -418,28 +417,30 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
                 throw new Error(`Parsed JSON from ${persona.Role} does not contain a valid '${ideasKey}' array.`);
             }
 
+            // 2. GENERATE AND STORE MARKDOWN (For the download feature)
             let reconstructedMarkdown = "";
             if (brainstormType === 'project') {
                 reconstructedMarkdown = ideasArray.map(idea =>
-                    `- **Idea:** ${sanitizeHTML(idea.idea || '')}\n- **Target Audience:** ${sanitizeHTML(idea.target_audience || '')}\n- **Problem Solved:** ${sanitizeHTML(idea.problem_solved || '')}\n- **My Rationale:** ${sanitizeHTML(idea.rationale || '')}`
-                ).join('\n\n<hr class="my-3">\n\n'); // Use an <hr> for clear visual separation
+                    `- **Idea:** ${idea.idea || ''}\n- **Target Audience:** ${idea.target_audience || ''}\n- **Problem Solved:** ${idea.problem_solved || ''}\n- **My Rationale:** ${idea.rationale || ''}`
+                ).join('\n\n');
             } else { // research_paper
                 reconstructedMarkdown = ideasArray.map(idea =>
-                    `- **Research Question:** ${sanitizeHTML(idea.research_question || '')}\n- **Potential Methodology:** ${sanitizeHTML(idea.potential_methodology || '')}\n- **Potential Contribution:** ${sanitizeHTML(idea.potential_contribution || '')}\n- **My Rationale:** ${sanitizeHTML(idea.rationale || '')}`
-                ).join('\n\n<hr class="my-3">\n\n');
+                    `- **Research Question:** ${idea.research_question || ''}\n- **Potential Methodology:** ${idea.potential_methodology || ''}\n- **Potential Contribution:** ${idea.potential_contribution || ''}\n- **My Rationale:** ${idea.rationale || ''}`
+                ).join('\n\n');
             }
+            // Sanitize the final markdown string before storing, just in case.
+            brainstormState.ideationOutputs[persona.Role] = sanitizeHTML(reconstructedMarkdown);
 
-            brainstormState.ideationOutputs[persona.Role] = reconstructedMarkdown; // Save for restoration
-
-            const startingIdeaCounter = ideaCounter;
-            const ideasWithContext = ideasArray.map(idea => ({
-                ...idea,
-                persona: persona,
-                id: `idea-${ideaCounter++}`
+            // 3. POPULATE GLOBAL STATE (for other app features)
+            const ideasWithContext = ideasArray.map((idea, index) => ({
+                role: persona.Role,
+                idea: idea, // Store the clean idea object
+                id: `idea-${ideaCounter + index}`
             }));
             allParsedIdeas.push(...ideasWithContext);
 
-            renderIdeationBlock(persona, reconstructedMarkdown, startingIdeaCounter);
+            // 4. RENDER UI using the parsed OBJECTS (for robust display)
+            ideaCounter = renderIdeationBlock(persona, ideasArray, ideaCounter);
 
         } catch (error) {
             console.error("Error in runDivergentIdeation for persona " + persona.Role, error);
@@ -458,52 +459,33 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
     }
 }
 
-function renderIdeationBlock(persona, ideasText, ideaCounterStart) {
+function renderIdeationBlock(persona, ideasArray, ideaCounterStart) {
     let ideaCounter = ideaCounterStart;
     const personaIdeasContainer = document.createElement('div');
     personaIdeasContainer.className = 'agent-card bg-white p-4 rounded-lg border';
     personaIdeasContainer.innerHTML = `<h3 class="font-bold text-blue-600 mb-2">${sanitizeHTML(persona.Role)}</h3>`;
 
-    const ideaBlockRegex = /- \*\*(Idea|Research Question):\*\*([\s\S]*?)(?=- \*\*(Idea|Research Question):\*\*|$)/g;
-    const matches = [...ideasText.matchAll(ideaBlockRegex)];
-
-    if (matches.length === 0) {
-        personaIdeasContainer.innerHTML += `<p class="text-gray-500 italic">This agent did not generate any ideas in the correct format.</p>`;
-        console.log(ideasText); // Debugging output
+    if (!ideasArray || ideasArray.length === 0) {
+        personaIdeasContainer.innerHTML += `<p class="text-gray-500 italic">This agent did not generate any ideas.</p>`;
+        ideasContainer.appendChild(personaIdeasContainer);
+        return ideaCounter;
     }
 
-    for (const match of matches) {
-        const block = match[0];
-        // Match title which is mandatory
-        const ideaTitleMatch = block.match(/- \*\*(?:Idea|Research Question):\*\*\s*(.*?)(?:\n|$)/);
-
-        if (!ideaTitleMatch || !ideaTitleMatch[1].trim()) {
-            console.warn(`[${persona.Role}] Skipped block due to missing title. Content:`, block);
-            continue; // Skip this block if it doesn't even have a title
-        }
-        const title = ideaTitleMatch[1].trim();
-
-        let ideaData = { title: title };
-
-        // Optional fields, grab them if they exist. Use N/A if not found.
-        const rationaleMatch = block.match(/- \*\*My Rationale:\*\*\s*(.*)/s);
-        ideaData.rationale = rationaleMatch ? rationaleMatch[1].trim() : 'N/A';
-
+    for (const idea of ideasArray) {
+        let ideaData = {};
         if (brainstormType === 'project') {
-            const targetAudienceMatch = block.match(/- \*\*Target Audience:\*\*\s*(.*?)(?:\n|$)/);
-            const problemSolvedMatch = block.match(/- \*\*Problem Solved:\*\*\s*(.*?)(?:\n|$)/);
-            ideaData.targetAudience = targetAudienceMatch ? targetAudienceMatch[1].trim() : 'N/A';
-            ideaData.problemSolved = problemSolvedMatch ? problemSolvedMatch[1].trim() : 'N/A';
+            ideaData.title = idea.idea || 'Untitled Idea';
+            ideaData.targetAudience = idea.target_audience || 'N/A';
+            ideaData.problemSolved = idea.problem_solved || 'N/A';
+            ideaData.rationale = idea.rationale || 'N/A';
         } else { // research_paper
-            const methodologyMatch = block.match(/- \*\*Potential Methodology:\*\*\s*(.*?)(?:\n|$)/);
-            const contributionMatch = block.match(/- \*\*Potential Contribution:\*\*\s*(.*?)(?:\n|$)/);
-            ideaData.potentialMethodology = methodologyMatch ? methodologyMatch[1].trim() : 'N/A';
-            ideaData.potentialContribution = contributionMatch ? contributionMatch[1].trim() : 'N/A';
+            ideaData.title = idea.research_question || 'Untitled Question';
+            ideaData.potentialMethodology = idea.potential_methodology || 'N/A';
+            ideaData.potentialContribution = idea.potential_contribution || 'N/A';
+            ideaData.rationale = idea.rationale || 'N/A';
         }
 
         const ideaId = `idea-${ideaCounter++}`;
-        allParsedIdeas.push({ role: persona.Role, idea: ideaData, id: ideaId });
-
         const checkboxContainer = document.createElement('div');
         checkboxContainer.className = 'flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 border-b';
         const ideaDataString = JSON.stringify(ideaData);
@@ -520,6 +502,7 @@ function renderIdeationBlock(persona, ideasText, ideaCounterStart) {
         personaIdeasContainer.appendChild(checkboxContainer);
     }
     ideasContainer.appendChild(personaIdeasContainer);
+    return ideaCounter; // Return the final counter value
 }
 
 toConvergentBtn.addEventListener('click', () => {
@@ -534,14 +517,16 @@ toConvergentBtn.addEventListener('click', () => {
 
     const selectedIdeas = allParsedIdeas.filter(parsedIdea => selectedIdeaIds.includes(parsedIdea.id));
     const rawIdeasString = selectedIdeas.map(item => {
-        const ideaObj = item.idea;
-        let summary = `- (From ${item.role}) **${ideaObj.title}**\n`;
+
+        let summary = ``;
         if (brainstormType === 'project') {
-            summary += `  - **For:** ${ideaObj.targetAudience}\n  - **Problem:** ${ideaObj.problemSolved}\n`;
+            summary = `- (From ${item.persona.Role}) **${item.idea}**\n`;
+            summary += `  - ** For:** ${item.target_audience} \n - ** Problem:** ${ideaObj.problem_solved} \n`;
         } else {
-            summary += `  - **Methodology:** ${ideaObj.potentialMethodology}\n  - **Contribution:** ${ideaObj.potentialContribution}\n`;
+            summary = `- (From ${item.persona.Role}) **${item.research_question}**\n`;
+            summary += `  - ** Methodology:** ${item.potential_methodology} \n - ** Contribution:** ${item.potential_contribution} \n`;
         }
-        summary += `  - **Rationale:** ${ideaObj.rationale}`;
+        summary += `  - ** Rationale:** ${item.rationale} `;
         return summary;
     }).join('\n\n---\n\n');
 
@@ -567,14 +552,14 @@ async function runConvergentEvaluation(rawIdeasString) {
         renderConvergentEvaluation(evaluationText);
     } catch (error) {
         console.error("Error in runConvergentEvaluation:", error);
-        evaluationContainer.innerHTML = `<p class="text-red-500">Error during evaluation: ${error.message}</p>`;
+        evaluationContainer.innerHTML = `< p class="text-red-500" > Error during evaluation: ${error.message}</p > `;
     } finally {
         hideLoader(convergentLoader);
     }
 }
 
 function renderConvergentEvaluation(evaluationText) {
-    const jsonMatch = evaluationText.match(/```json\s*([\s\S]*?)\s*```/);
+    const jsonMatch = evaluationText.match(/```json\s * ([\s\S] *?) \s * ```/);
     let topIdeas = [];
     let evaluationMarkdown = evaluationText;
 
@@ -598,7 +583,7 @@ function renderConvergentEvaluation(evaluationText) {
     for (let i = 0; i < parts.length; i++) {
         if (parts[i].match(tableRegex)) {
             finalHTML += `
-                        <div class="mb-4 flex flex-wrap gap-2">
+            < div class="mb-4 flex flex-wrap gap-2" >
                             <button class="table-toggle-btn text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
                                 Show the Evaluation Table
                             </button>
@@ -608,9 +593,9 @@ function renderConvergentEvaluation(evaluationText) {
                             <button class="table-collapse-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
                                 Collapse All
                             </button>
-                        </div>
-                        <div class="evaluation-table-wrapper hidden">${parts[i]}</div>
-                    `;
+                        </div >
+        <div class="evaluation-table-wrapper hidden">${parts[i]}</div>
+    `;
         } else {
             finalHTML += parts[i];
         }
@@ -682,7 +667,7 @@ function renderConvergentEvaluation(evaluationText) {
         topIdeas.forEach(idea => {
             const planBtn = document.createElement('button');
             planBtn.className = 'bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all duration-200 text-left';
-            planBtn.innerHTML = `<span class="font-bold">Plan:</span> ${sanitizeHTML(idea.title)}`;
+            planBtn.innerHTML = `< span class="font-bold" > Plan:</span > ${sanitizeHTML(idea.title)} `;
             planBtn.onclick = () => runImplementationPlanning(idea);
             listContainer.appendChild(planBtn);
         });
@@ -700,11 +685,11 @@ function makeTableCellsCollapsible() {
             collapsibleFound = true;
             const originalContent = cell.innerHTML;
             cell.innerHTML = `
-                        <div class="collapsible-wrapper">
+        < div class="collapsible-wrapper" >
                             <div class="collapsible-content collapsed">${originalContent}</div>
                             <button class="toggle-expand">Read more</button>
-                        </div>
-                    `;
+                        </div >
+        `;
         }
     });
 
@@ -728,7 +713,7 @@ evaluationContainer.addEventListener('click', (e) => {
 async function runImplementationPlanning(idea) {
     updateProgress(4);
     stage4Container.classList.remove('hidden');
-    stage4Subtitle.textContent = `The AI expert has generated a high-level ${brainstormType === 'project' ? 'implementation plan' : 'research outline'} for the selected idea.`;
+    stage4Subtitle.textContent = `The AI expert has generated a high - level ${brainstormType === 'project' ? 'implementation plan' : 'research outline'} for the selected idea.`;
     window.scrollTo({ top: stage4Container.offsetTop, behavior: 'smooth' });
     showLoader(planningLoader);
     planningContainer.innerHTML = '';
@@ -748,7 +733,7 @@ async function runImplementationPlanning(idea) {
         updateProgress(5);
     } catch (error) {
         console.error("Error in runImplementationPlanning:", error);
-        planningContainer.innerHTML = `<p class="text-red-500">Error generating the final document: ${error.message}</p>`;
+        planningContainer.innerHTML = `< p class="text-red-500" > Error generating the final document: ${error.message}</p > `;
     } finally {
         hideLoader(planningLoader);
     }
@@ -757,9 +742,9 @@ async function runImplementationPlanning(idea) {
 async function renderImplementationPlan(planText) {
     planningContainer.innerHTML = '';
     chartZoomLevel = 1.0;
-    const mermaidRegex = /```mermaid\s*([\s\S]*?)```/;
+    const mermaidRegex = /```mermaid\s * ([\s\S] *?)```/;
     const mermaidMatch = planText.match(mermaidRegex);
-    const markdownContent = planText.replace(mermaidRegex, '').replace(/^```markdown\s*|```\s*$/g, '').trim();
+    const markdownContent = planText.replace(mermaidRegex, '').replace(/^```markdown\s *| ```\s*$/g, '').trim();
     planningContainer.innerHTML = marked.parse(markdownContent);
 
     if (mermaidMatch && mermaidMatch[1]) {
@@ -767,12 +752,12 @@ async function renderImplementationPlan(planText) {
         const chartWrapper = document.createElement('div');
         chartWrapper.className = 'mt-6';
         chartWrapper.innerHTML = `
-                    <div id="chart-controls">
+        < div id = "chart-controls" >
                         <button id="zoom-in-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom In</button>
                         <button id="zoom-out-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom Out</button>
                         <button id="reset-zoom-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Reset</button>
                         <button id="fullscreen-btn" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg ml-auto">Fullscreen</button>
-                    </div>`;
+                    </div > `;
         const chartContainer = document.createElement('div');
         chartContainer.id = 'chart-container';
         const mermaidDiv = document.createElement('div');
@@ -782,7 +767,7 @@ async function renderImplementationPlan(planText) {
         planningContainer.appendChild(chartWrapper);
 
         try {
-            const { svg } = await mermaid.render(`mermaid-diag-${Date.now()}`, mermaidCode);
+            const { svg } = await mermaid.render(`mermaid - diag - ${Date.now()} `, mermaidCode);
             mermaidDiv.innerHTML = svg;
             const svgElement = mermaidDiv.querySelector('svg');
 
@@ -802,7 +787,7 @@ async function renderImplementationPlan(planText) {
             };
         } catch (e) {
             console.error("Error rendering Mermaid chart:", e);
-            mermaidDiv.innerHTML = `<p class="text-red-500 font-bold">Mermaid Chart Error:</p><pre>${e.message}</pre><pre>${sanitizeHTML(mermaidCode)}</pre>`;
+            mermaidDiv.innerHTML = `< p class="text-red-500 font-bold" > Mermaid Chart Error:</p ><pre>${e.message}</pre><pre>${sanitizeHTML(mermaidCode)}</pre>`;
         }
     }
 }
@@ -814,8 +799,8 @@ exportMdBtn.addEventListener('click', () => {
 
 function generateMarkdownExport() {
     const md = [];
-    md.push(`# Brainstorm Session: ${brainstormState.topic}`);
-    md.push(`**Type:** ${brainstormState.type}`);
+    md.push(`# Brainstorm Session: ${brainstormState.topic} `);
+    md.push(`** Type:** ${brainstormState.type} `);
 
     if (brainstormState.combinedContext) {
         md.push('\n## Stage 1: Context & Team');
@@ -825,22 +810,22 @@ function generateMarkdownExport() {
     if (brainstormState.personas) {
         md.push('\n### Assembled Agent Team');
         brainstormState.personas.forEach(p => {
-            md.push(`- **${p.Role}**`);
-            md.push(`  - **Goal:** ${p.Goal}`);
-            md.push(`  - **Backstory:** ${p.Backstory}`);
+            md.push(`- ** ${p.Role}** `);
+            md.push(`  - ** Goal:** ${p.Goal} `);
+            md.push(`  - ** Backstory:** ${p.Backstory} `);
         });
     }
     if (brainstormState.ideationOutputs) {
         md.push('\n## Stage 2: Divergent Ideation');
         for (const role in brainstormState.ideationOutputs) {
-            md.push(`\n### Ideas from ${role}`);
+            md.push(`\n### Ideas from ${role} `);
             md.push(brainstormState.ideationOutputs[role]);
         }
     }
     if (brainstormState.evaluationOutput) {
         md.push('\n## Stage 3: Convergent Evaluation');
         // Remove the JSON block from the evaluation for a cleaner md export
-        const cleanEvaluation = brainstormState.evaluationOutput.replace(/```json\s*([\s\S]*?)\s*```/, '').trim();
+        const cleanEvaluation = brainstormState.evaluationOutput.replace(/```json\s * ([\s\S] *?) \s * ```/, '').trim();
         md.push(cleanEvaluation);
     }
     if (brainstormState.finalPlanOutput) {
