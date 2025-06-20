@@ -672,10 +672,8 @@ function makeTableCellsCollapsible() {
         if (cell.textContent.length > CHARACTER_THRESHOLD) {
             const originalContent = cell.innerHTML;
             cell.innerHTML = `
-        < div class="collapsible-wrapper" >
-                            <div class="collapsible-content collapsed">${originalContent}</div>
-                            <button class="toggle-expand">Read more</button>
-                        </div >
+                <div class="collapsible-content collapsed">${originalContent}</div>
+                <button class="toggle-expand">Read more</button>
         `;
         }
     });

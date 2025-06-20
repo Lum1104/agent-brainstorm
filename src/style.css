@@ -83,7 +83,7 @@ body {
 }
 
 .collapsible-content.collapsed {
-    max-height: 2em;
+    max-height: 2.5em;
     -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
     mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
@@ -112,7 +112,7 @@ body {
     align-items: center;
 }
 
-#chart-container {
+.chart-container {
     border: 1px solid #d1d5db;
     border-radius: 0.5rem;
     padding: 1rem;
@@ -122,14 +122,14 @@ body {
     resize: vertical;
 }
 
-#chart-container .mermaid {
+.chart-container .mermaid {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100%;
 }
 
-#chart-container .mermaid svg {
+.chart-container .mermaid svg {
     max-width: none;
     height: auto;
     transition: transform 0.2s ease-in-out;
