@@ -3,3 +3,4 @@ langchain-google-genai
 langchain-core
 langchain_community
 duckduckgo-search
+pypdf
