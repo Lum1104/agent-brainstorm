@@ -12,8 +12,8 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_community.tools import DuckDuckGoSearchRun
 
 # Import data structures and prompts
-from schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList, CritiqueList
-from prompts import persona_prompts, ideation_prompts, evaluation_prompts, planning_prompts, red_team_prompts
+from .schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList, CritiqueList
+from .prompts import persona_prompts, ideation_prompts, evaluation_prompts, planning_prompts, red_team_prompts
 
 class BrainstormingWorkflow:
     """

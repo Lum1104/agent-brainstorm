@@ -1,6 +1,7 @@
-langchain
-langchain-google-genai
-langchain-core
-langchain_community
+langchain==0.3.25
+langchain-community==0.3.25
+langchain-core==0.3.65
+langchain-google-genai==2.1.5
+langchain-openai==0.3.23
 duckduckgo-search
 pypdf
