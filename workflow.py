@@ -12,8 +12,8 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_community.tools import DuckDuckGoSearchRun
 
 # Import data structures and prompts
-from schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList
-from prompts import persona_prompts, ideation_prompts, evaluation_prompts, planning_prompts
+from schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList, CritiqueList
+from prompts import persona_prompts, ideation_prompts, evaluation_prompts, planning_prompts, red_team_prompts
 
 class BrainstormingWorkflow:
     """
@@ -34,21 +34,24 @@ class BrainstormingWorkflow:
         self.combined_context = ""
         self.personas = []
         self.all_generated_ideas = []
+        self.critiques = []
         self.evaluation_markdown = ""
         self.final_plan_text = ""
         
+        # Prompts are now imported from prompts.py
         self.persona_prompts = persona_prompts
         self.ideation_prompts = ideation_prompts
         self.evaluation_prompts = evaluation_prompts
         self.planning_prompts = planning_prompts
+        self.red_team_prompts = red_team_prompts
 
 
     async def run_context_generation(self, topic: str, pdf_text: str = None) -> str:
         """
         Generates a combined context from a web search and an optional user-provided PDF.
         """
-        print(f"\n--- Context Generation: Searching for '{topic}' ---")
-        self.topic = topic # Store topic for export
+        print(f"\n--- Stage 1: Context Generation: Searching for '{topic}' ---")
+        self.topic = topic 
         search = DuckDuckGoSearchRun()
         search_results = search.run(topic)
         print("✅ Web search complete.")
@@ -69,7 +72,7 @@ class BrainstormingWorkflow:
                 combined_context += f"\n\n---\n\n**Uploaded Document Context:**\n{pdf_summary}"
                 print("✅ PDF summary generated and combined.")
             
-            self.combined_context = combined_context # Store context for export
+            self.combined_context = combined_context
             print("\n--- Combined Context Summary ---")
             print(self.combined_context)
             return self.combined_context
@@ -79,7 +82,7 @@ class BrainstormingWorkflow:
 
     async def run_preview_agent(self, topic: str, combined_context: str) -> List[Dict[str, Any]]:
         """Generates a team of distinct expert personas for a given topic."""
-        print(f"\n--- Stage 1: Assembling Agent Team for '{topic}' ({self.brainstorm_type}) ---")
+        print(f"\n--- Stage 2: Assembling Agent Team for '{topic}' ({self.brainstorm_type}) ---")
         parser = JsonOutputParser(pydantic_object=PersonaList)
         template = self.persona_prompts[self.brainstorm_type]
         prompt = PromptTemplate(
@@ -90,7 +93,7 @@ class BrainstormingWorkflow:
         chain = prompt | self.llm | parser
         try:
             response = await chain.ainvoke({"topic": topic, "combined_context": combined_context})
-            self.personas = response['personas'] # Store personas for export
+            self.personas = response['personas']
             print("✅ Persona team assembled successfully.")
             for p in self.personas:
                 print(f"- Role: {p['Role']}\n  Goal: {p['Goal']}\n  Backstory: {p['Backstory']}\n")
@@ -101,13 +104,13 @@ class BrainstormingWorkflow:
 
     async def run_divergent_ideation(self, topic: str, personas: List[Dict[str, Any]], combined_context: str):
         """Generates a wide range of ideas from the perspective of each persona, parsing them as JSON."""
-        print("\n--- Stage 2: Divergent Ideation (Generating Ideas in JSON) ---")
+        print("\n--- Stage 3: Divergent Ideation (Generating Ideas in JSON) ---")
         self.all_generated_ideas = []
         
         if self.brainstorm_type == 'project':
             parser = JsonOutputParser(pydantic_object=ProjectIdeasList)
             ideas_key = 'project_ideas'
-        else: # research_paper
+        else:
             parser = JsonOutputParser(pydantic_object=ResearchIdeasList)
             ideas_key = 'research_ideas'
             
@@ -138,24 +141,66 @@ class BrainstormingWorkflow:
         await asyncio.gather(*(generate_for_persona(p) for p in personas))
         print("\n✅ Divergent ideation complete.")
 
+    async def run_red_team_critique(self, ideas_to_critique: List[Dict[str, Any]]):
+        """Runs a 'Red Team' agent to critique a list of ideas."""
+        print("\n--- Stage 4: Red Team Critique ---")
+        if not ideas_to_critique:
+            print("⚠️ No ideas to critique. Skipping.")
+            return
+
+        # Format ideas into a string for the prompt
+        critique_input_str = ""
+        for i, idea in enumerate(ideas_to_critique):
+            title = idea.get('idea') or idea.get('research_question', f"Idea {i+1}")
+            critique_input_str += f"Idea Title: {title}\n"
+            for key, value in idea.items():
+                if key not in ['role']: # Don't include the role in the critique prompt, blind critique
+                    critique_input_str += f"- {key.replace('_', ' ').title()}: {value}\n"
+            critique_input_str += "---\n"
+
+        parser = JsonOutputParser(pydantic_object=CritiqueList)
+        template = self.red_team_prompts[self.brainstorm_type]
+        prompt = PromptTemplate(
+            template=template,
+            input_variables=["ideas_to_critique"],
+            partial_variables={"format_instructions": parser.get_format_instructions()},
+        )
+        chain = prompt | self.llm | parser
+
+        try:
+            response = await chain.ainvoke({"ideas_to_critique": critique_input_str})
+            self.critiques = response.get('critiques', [])
+            print("✅ Red Team critique complete. The analyst will now consider these critiques.")
+            # Display critiques to the user
+            for crit in self.critiques:
+                print(f"\nCritique for '{crit['idea_title']}':")
+                print(f"  - {crit['critique']}")
+
+        except Exception as e:
+            print(f"❌ Error during Red Team critique: {e}")
+            self.critiques = []
+
+
     async def run_convergent_evaluation(self, ideas_to_evaluate: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyzes, critiques, and selects the top ideas from a given list of structured objects."""
-        print("\n--- Stage 3: Convergent Evaluation (Analyzing & Selecting) ---")
+        print("\n--- Stage 5: Convergent Evaluation (Analyzing & Selecting) ---")
         if not ideas_to_evaluate:
             print("⚠️ No ideas to evaluate. Skipping.")
             return {}
 
+        # Combine ideas and their critiques for the evaluator
         raw_ideas_string = ""
-        for item in ideas_to_evaluate:
-            summary = f"- (From {item['role']}) "
-            if self.brainstorm_type == 'project':
-                summary += f"**{item['idea']}**\n"
-                summary += f"  - For: {item['target_audience']}\n  - Problem: {item['problem_solved']}\n"
-            else:
-                summary += f"**{item['research_question']}**\n"
-                summary += f"  - Methodology: {item['potential_methodology']}\n  - Contribution: {item['potential_contribution']}\n"
-            summary += f"  - Rationale: {item['rationale']}\n---\n"
-            raw_ideas_string += summary
+        for idea in ideas_to_evaluate:
+            title = idea.get('idea') or idea.get('research_question', 'Untitled')
+            raw_ideas_string += f"### Idea from {idea['role']}: {title}\n"
+            for key, value in idea.items():
+                 raw_ideas_string += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+            
+            # Find and add the matching critique, if it exists
+            matching_critique = next((c['critique'] for c in self.critiques if c['idea_title'] == title), None)
+            if matching_critique:
+                raw_ideas_string += f"- **Red Team Critique:** {matching_critique}\n"
+            raw_ideas_string += "\n---\n"
         
         parser = StrOutputParser()
         template = self.evaluation_prompts[self.brainstorm_type]
@@ -178,7 +223,7 @@ class BrainstormingWorkflow:
                 except (json.JSONDecodeError, TypeError) as e:
                     print(f"❌ Error decoding or validating JSON from evaluation: {e}")
 
-            self.evaluation_markdown = analysis_markdown # Store for export
+            self.evaluation_markdown = analysis_markdown 
             print("✅ Convergent evaluation complete.")
             print("\n--- Full Analysis ---")
             print(self.evaluation_markdown)
@@ -196,14 +241,14 @@ class BrainstormingWorkflow:
 
     async def run_implementation_planning(self, idea: Dict[str, str]):
         """Generates a project initiation plan or research outline for a selected idea."""
-        print(f"\n--- Stage 4: Final Document Generation for '{idea['title']}' ---")
+        print(f"\n--- Stage 6: Final Document Generation for '{idea['title']}' ---")
         parser = StrOutputParser()
         template = self.planning_prompts[self.brainstorm_type]
         prompt = PromptTemplate.from_template(template)
         chain = prompt | self.llm | parser
         try:
             plan_text = await chain.ainvoke({"title": idea['title'], "description": idea['description']})
-            self.final_plan_text = plan_text # Store full plan for export
+            self.final_plan_text = plan_text 
             
             markdown_plan = self.final_plan_text
             mermaid_chart = ""

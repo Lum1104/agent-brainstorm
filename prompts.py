@@ -43,24 +43,61 @@ STRICTLY return your response as a single, valid JSON object in the following fo
 {format_instructions}"""
 }
 
-evaluation_prompts = {
-    'project': """You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas. Your task is to perform a convergent analysis.
+red_team_prompts = {
+    'project': """You are a "Red Team" agent, a skeptical critic and devil's advocate. Your task is to challenge a list of project ideas by identifying potential flaws.
+For each idea provided, you must generate a concise but impactful critique.
 
-1. **Synthesize & Cluster:** Read all the ideas. De-duplicate them and group similar concepts into project themes.
-2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification'.
+Focus on aspects like:
+- Hidden assumptions
+- Potential for unintended negative consequences
+- Market viability challenges (e.g., "Winner's Curse")
+- Overlooked technical hurdles
+- Ethical concerns
+
+Here are the ideas to critique:
+---
+{ideas_to_critique}
+---
+
+STRICTLY return your response as a single, valid JSON object. Each critique should correspond to an original idea.
+{format_instructions}""",
+    'research_paper': """You are a "Red Team" agent, a skeptical academic rival. Your task is to challenge a list of research ideas by identifying potential flaws.
+For each research question, you must generate a concise but impactful critique.
+
+Focus on aspects like:
+- Unexamined assumptions in the premise
+- Methodological weaknesses or biases
+- The "so what?" problem (lack of significant contribution)
+- Ethical implications of the research
+- Risk of p-hacking or non-reproducible results
+
+Here are the research questions to critique:
+---
+{ideas_to_critique}
+---
+
+STRICTLY return your response as a single, valid JSON object. Each critique should correspond to an original research question.
+{format_instructions}"""
+}
+
+evaluation_prompts = {
+    'project': """You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas and their critiques from a 'Red Team'. Your task is to perform a convergent analysis, taking both into account.
+
+1. **Synthesize & Cluster:** Read all the ideas and their critiques. De-duplicate them and group similar concepts into project themes.
+2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification (incorporating red team feedback)'.
 3. **Select Top Ideas:** After the table, explicitly state 'Here are the top ideas:'. Then, provide a JSON array of objects for the top 3-5 projects you recommend. Each object needs 'title' (a concise project title) and 'description' (a DETAILED explanation of the project). This JSON array must be at the very end in a ```json code block.
 
-Raw Ideas:
+Raw Ideas & Critiques:
 ---
 {raw_ideas}
 ---""",
-    'research_paper': """You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas. Your task is to perform a convergent analysis.
+    'research_paper': """You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas and critiques from a 'Red Team'. Your task is to perform a convergent analysis, taking both into account.
 
-1. **Synthesize & Cluster:** Read all the ideas. Group similar concepts into distinct research avenues.
-2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty (1-10)', 'Methodology (1-10)', 'Contribution (1-10)', 'Justification'.
+1. **Synthesize & Cluster:** Read all the ideas and critiques. Group similar concepts into distinct research avenues.
+2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty (1-10)', 'Methodology (1-10)', 'Contribution (1-10)', 'Justification (incorporating red team feedback)'.
 3. **Select Top Ideas:** After the table, explicitly state 'Here are the top ideas:'. Then, provide a JSON array of objects for the top 3-5 research questions you recommend. Each object needs 'title' (a concise research avenue) and 'description' (a DETAILED explanation of the study). This JSON array must be at the very end in a ```json code block.
 
-Raw Ideas:
+Raw Ideas & Critiques:
 ---
 {raw_ideas}
 ---"""
