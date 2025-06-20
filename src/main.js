@@ -579,7 +579,7 @@ function renderConvergentEvaluation(evaluationText) {
         }
     }
 
-    evaluationContainer.innerHTML = marked.parse(evaluationMarkdown);
+    evaluationContainer.innerHTML = marked.parse(evaluationMarkdown, { sanitize: false });
 
     const tables = evaluationContainer.querySelectorAll('table');
     tables.forEach((table, index) => {
@@ -722,54 +722,66 @@ async function runImplementationPlanning(idea) {
 async function renderImplementationPlan(planText) {
     planningContainer.innerHTML = '';
     chartZoomLevel = 1.0;
-    const mermaidRegex = /```mermaid\s * ([\s\S] *?)```/;
-    const mermaidMatch = planText.match(mermaidRegex);
-    const markdownContent = planText.replace(mermaidRegex, '').replace(/^```markdown\s *| ```\s*$/g, '').trim();
-    planningContainer.innerHTML = marked.parse(markdownContent);
 
-    if (mermaidMatch && mermaidMatch[1]) {
-        const mermaidCode = mermaidMatch[1].trim();
-        const chartWrapper = document.createElement('div');
-        chartWrapper.className = 'mt-6';
-        chartWrapper.innerHTML = `
-        < div id = "chart-controls" >
-                        <button id="zoom-in-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom In</button>
-                        <button id="zoom-out-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom Out</button>
-                        <button id="reset-zoom-btn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Reset</button>
-                        <button id="fullscreen-btn" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg ml-auto">Fullscreen</button>
-                    </div > `;
-        const chartContainer = document.createElement('div');
-        chartContainer.id = 'chart-container';
-        const mermaidDiv = document.createElement('div');
-        mermaidDiv.className = 'mermaid';
-        chartContainer.appendChild(mermaidDiv);
-        chartWrapper.appendChild(chartContainer);
-        planningContainer.appendChild(chartWrapper);
+    const markdownContent = planText.replace(/^```markdown\s*|```\s*$/g, '').trim();
+    planningContainer.innerHTML = marked.parse(markdownContent, { sanitize: false });
 
-        try {
-            const { svg } = await mermaid.render(`mermaid - diag - ${Date.now()} `, mermaidCode);
-            mermaidDiv.innerHTML = svg;
-            const svgElement = mermaidDiv.querySelector('svg');
+    const codeBlocks = planningContainer.querySelectorAll('pre > code');
+    codeBlocks.forEach(async (codeBlock) => {
+        const code = codeBlock.innerText.trim();
+        // Check for common Mermaid keywords
+        if (code.startsWith('graph') || code.startsWith('gantt') || code.startsWith('sequenceDiagram') || code.startsWith('pie')) {
+            const preElement = codeBlock.parentElement;
+            const chartWrapper = document.createElement('div');
+            chartWrapper.className = 'mt-6';
+            chartWrapper.innerHTML = `
+                <div id="chart-controls" class="flex items-center gap-2 mb-2">
+                    <button class="zoom-in-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom In</button>
+                    <button class="zoom-out-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Zoom Out</button>
+                    <button class="reset-zoom-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded-lg">Reset</button>
+                    <button class="fullscreen-btn text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 px-3 rounded-lg ml-auto">Fullscreen</button>
+                </div>
+            `;
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'chart-container'; // Use a class instead of ID for multiple charts
+            const mermaidDiv = document.createElement('div');
+            mermaidDiv.className = 'mermaid';
 
-            const updateZoom = () => { svgElement.style.transform = `scale(${chartZoomLevel})`; };
-            chartWrapper.querySelector('#zoom-in-btn').onclick = () => { chartZoomLevel += 0.1; updateZoom(); };
-            chartWrapper.querySelector('#zoom-out-btn').onclick = () => { chartZoomLevel = Math.max(0.1, chartZoomLevel - 0.1); updateZoom(); };
-            chartWrapper.querySelector('#reset-zoom-btn').onclick = () => { chartZoomLevel = 1.0; updateZoom(); };
-            chartWrapper.querySelector('#fullscreen-btn').onclick = () => {
-                fullscreenModalContent.innerHTML = '';
-                const clonedSvg = svgElement.cloneNode(true);
-                clonedSvg.style.transform = '';
-                clonedSvg.style.maxWidth = '95vw';
-                clonedSvg.style.maxHeight = '95vh';
-                fullscreenModalContent.appendChild(clonedSvg);
-                fullscreenModal.classList.remove('hidden');
-                document.body.style.overflow = 'hidden';
-            };
-        } catch (e) {
-            console.error("Error rendering Mermaid chart:", e);
-            mermaidDiv.innerHTML = `< p class="text-red-500 font-bold" > Mermaid Chart Error:</p ><pre>${e.message}</pre><pre>${sanitizeHTML(mermaidCode)}</pre>`;
+            chartContainer.appendChild(mermaidDiv);
+            chartWrapper.appendChild(chartContainer);
+
+            // Replace the <pre> block with our new chart wrapper
+            preElement.parentNode.replaceChild(chartWrapper, preElement);
+
+            try {
+                // Use a unique ID for each render call
+                const chartId = `mermaid-diag-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                const { svg } = await mermaid.render(chartId, code);
+                mermaidDiv.innerHTML = svg;
+                const svgElement = mermaidDiv.querySelector('svg');
+
+                let currentZoom = 1.0;
+                const updateZoom = () => { svgElement.style.transform = `scale(${currentZoom})`; };
+
+                chartWrapper.querySelector('.zoom-in-btn').onclick = () => { currentZoom += 0.1; updateZoom(); };
+                chartWrapper.querySelector('.zoom-out-btn').onclick = () => { currentZoom = Math.max(0.1, currentZoom - 0.1); updateZoom(); };
+                chartWrapper.querySelector('.reset-zoom-btn').onclick = () => { currentZoom = 1.0; updateZoom(); };
+                chartWrapper.querySelector('.fullscreen-btn').onclick = () => {
+                    fullscreenModalContent.innerHTML = '';
+                    const clonedSvg = svgElement.cloneNode(true);
+                    clonedSvg.style.transform = '';
+                    clonedSvg.style.maxWidth = '95vw';
+                    clonedSvg.style.maxHeight = '95vh';
+                    fullscreenModalContent.appendChild(clonedSvg);
+                    fullscreenModal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                };
+            } catch (e) {
+                console.error("Error rendering Mermaid chart:", e);
+                mermaidDiv.innerHTML = `<p class="text-red-500 font-bold">Mermaid Chart Error:</p><pre>${e.message}</pre><pre>${sanitizeHTML(code)}</pre>`;
+            }
         }
-    }
+    });
 }
 
 exportMdBtn.addEventListener('click', () => {
