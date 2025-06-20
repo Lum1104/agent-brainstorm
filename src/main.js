@@ -559,7 +559,12 @@ async function runConvergentEvaluation(rawIdeasString) {
 }
 
 function renderConvergentEvaluation(evaluationText) {
-    const jsonMatch = evaluationText.match(/```json\s * ([\s\S] *?) \s * ```/);
+    // Clear previous content
+    evaluationContainer.innerHTML = '';
+    topIdeasContainer.innerHTML = '';
+    evaluationControls.classList.add('hidden');
+
+    const jsonMatch = evaluationText.match(/```json\s*([\s\S]*?)\s*```/);
     let topIdeas = [];
     let evaluationMarkdown = evaluationText;
 
@@ -569,107 +574,91 @@ function renderConvergentEvaluation(evaluationText) {
             evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').replace(/\s*\(\d+-\d+\)/g, '').trim();
         } catch (e) {
             console.error("Failed to parse top ideas JSON:", e);
+            console.error("Problematic JSON string:", jsonMatch[1]);
+            evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').trim();
         }
     }
 
-    const parsedHTML = marked.parse(evaluationMarkdown);
+    evaluationContainer.innerHTML = marked.parse(evaluationMarkdown);
 
-    const tableRegex = /(<table[\s\S]*?<\/table>)/gi;
-    const parts = parsedHTML.split(tableRegex);
+    const tables = evaluationContainer.querySelectorAll('table');
+    tables.forEach((table, index) => {
+        // Create the wrapper and control buttons for each table
+        const wrapper = document.createElement('div');
+        wrapper.className = 'evaluation-table-wrapper hidden';
+        wrapper.id = `table-wrapper-${index}`;
 
-    let finalHTML = '';
-    let hasCollapsibleContent = false;
+        const controls = document.createElement('div');
+        controls.className = 'mb-4 flex flex-wrap gap-2';
+        controls.innerHTML = `
+            <button class="table-toggle-btn text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
+                Show Evaluation Table
+            </button>
+            <button class="table-expand-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
+                Expand All
+            </button>
+            <button class="table-collapse-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
+                Collapse All
+            </button>
+        `;
 
-    for (let i = 0; i < parts.length; i++) {
-        if (parts[i].match(tableRegex)) {
-            finalHTML += `
-            < div class="mb-4 flex flex-wrap gap-2" >
-                            <button class="table-toggle-btn text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
-                                Show the Evaluation Table
-                            </button>
-                            <button class="table-expand-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
-                                Expand All
-                            </button>
-                            <button class="table-collapse-all-btn text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" style="display: none;">
-                                Collapse All
-                            </button>
-                        </div >
-        <div class="evaluation-table-wrapper hidden">${parts[i]}</div>
-    `;
-        } else {
-            finalHTML += parts[i];
-        }
-    }
+        table.parentNode.insertBefore(controls, table);
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table);
 
-    evaluationContainer.innerHTML = finalHTML;
+        const toggleBtn = controls.querySelector('.table-toggle-btn');
+        const expandBtn = controls.querySelector('.table-expand-all-btn');
+        const collapseBtn = controls.querySelector('.table-collapse-all-btn');
 
-    const tableToggleBtns = evaluationContainer.querySelectorAll('.table-toggle-btn');
-    const tableExpandAllBtns = evaluationContainer.querySelectorAll('.table-expand-all-btn');
-    const tableCollapseAllBtns = evaluationContainer.querySelectorAll('.table-collapse-all-btn');
+        toggleBtn.addEventListener('click', () => {
+            const isHidden = wrapper.classList.toggle('hidden');
+            toggleBtn.textContent = isHidden ? 'Show Evaluation Table' : 'Hide Evaluation Table';
+            const hasCollapsibleCells = wrapper.querySelector('.collapsible-content');
 
-    tableToggleBtns.forEach((btn, index) => {
-        btn.addEventListener('click', () => {
-            const tableWrapper = btn.parentElement.nextElementSibling;
-            const expandBtn = tableExpandAllBtns[index];
-            const collapseBtn = tableCollapseAllBtns[index];
-
-            if (tableWrapper && tableWrapper.classList.contains('evaluation-table-wrapper')) {
-                const isHidden = tableWrapper.classList.toggle('hidden');
-                btn.textContent = isHidden ? 'Show the Evaluation Table' : 'Hide the Evaluation Table';
-
-                if (isHidden) {
-                    expandBtn.style.display = 'none';
-                    collapseBtn.style.display = 'none';
-                } else {
-                    const hasCollapsible = tableWrapper.querySelectorAll('.collapsible-content').length > 0;
-                    if (hasCollapsible) {
-                        expandBtn.style.display = 'inline-block';
-                        collapseBtn.style.display = 'inline-block';
-                    }
-                }
+            if (isHidden) {
+                expandBtn.style.display = 'none';
+                collapseBtn.style.display = 'none';
+            } else if (hasCollapsibleCells) {
+                expandBtn.style.display = 'inline-block';
+                collapseBtn.style.display = 'inline-block';
             }
         });
-    });
 
-    tableExpandAllBtns.forEach((btn, index) => {
-        btn.addEventListener('click', () => {
-            const tableWrapper = btn.parentElement.nextElementSibling;
-            if (tableWrapper) {
-                tableWrapper.querySelectorAll('.collapsible-content').forEach(content => {
-                    content.classList.remove('collapsed');
-                    content.nextElementSibling.textContent = 'Show less';
-                });
-            }
+        expandBtn.addEventListener('click', () => {
+            wrapper.querySelectorAll('.collapsible-content').forEach(content => {
+                content.classList.remove('collapsed');
+                content.nextElementSibling.textContent = 'Show less';
+            });
         });
-    });
 
-    tableCollapseAllBtns.forEach((btn, index) => {
-        btn.addEventListener('click', () => {
-            const tableWrapper = btn.parentElement.nextElementSibling;
-            if (tableWrapper) {
-                tableWrapper.querySelectorAll('.collapsible-content').forEach(content => {
-                    content.classList.add('collapsed');
-                    content.nextElementSibling.textContent = 'Read more';
-                });
-            }
+        collapseBtn.addEventListener('click', () => {
+            wrapper.querySelectorAll('.collapsible-content').forEach(content => {
+                content.classList.add('collapsed');
+                content.nextElementSibling.textContent = 'Read more';
+            });
         });
     });
 
     makeTableCellsCollapsible();
 
-    if (topIdeas.length > 0) {
+    // 4. Render the buttons for the top ideas
+    if (Array.isArray(topIdeas) && topIdeas.length > 0) {
         const header = document.createElement('h3');
         header.className = 'text-xl font-semibold text-gray-700 stage-title';
         header.textContent = 'Select a Top Idea to Plan';
         topIdeasContainer.appendChild(header);
+
         const listContainer = document.createElement('div');
         listContainer.className = 'flex flex-col sm:flex-row gap-4 mt-4';
         topIdeas.forEach(idea => {
-            const planBtn = document.createElement('button');
-            planBtn.className = 'bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all duration-200 text-left';
-            planBtn.innerHTML = `< span class="font-bold" > Plan:</span > ${sanitizeHTML(idea.title)} `;
-            planBtn.onclick = () => runImplementationPlanning(idea);
-            listContainer.appendChild(planBtn);
+            // Ensure the idea object has a title property before creating a button
+            if (idea && idea.title) {
+                const planBtn = document.createElement('button');
+                planBtn.className = 'bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition-all duration-200 text-left';
+                planBtn.innerHTML = `<span class="font-bold">Plan:</span> ${sanitizeHTML(idea.title)}`;
+                planBtn.onclick = () => runImplementationPlanning(idea);
+                listContainer.appendChild(planBtn);
+            }
         });
         topIdeasContainer.appendChild(listContainer);
     }
@@ -678,11 +667,9 @@ function renderConvergentEvaluation(evaluationText) {
 function makeTableCellsCollapsible() {
     const cells = evaluationContainer.querySelectorAll('table td');
     const CHARACTER_THRESHOLD = 50; // Collapse if content is longer than this
-    let collapsibleFound = false;
 
     cells.forEach(cell => {
         if (cell.textContent.length > CHARACTER_THRESHOLD) {
-            collapsibleFound = true;
             const originalContent = cell.innerHTML;
             cell.innerHTML = `
         < div class="collapsible-wrapper" >
@@ -692,13 +679,6 @@ function makeTableCellsCollapsible() {
         `;
         }
     });
-
-    if (collapsibleFound) {
-        evaluationControls.classList.remove('hidden');
-        evaluationControls.classList.add('flex');
-    } else {
-        evaluationControls.classList.add('hidden');
-    }
 }
 
 evaluationContainer.addEventListener('click', (e) => {
