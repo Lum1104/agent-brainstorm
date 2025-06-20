@@ -38,7 +38,6 @@ def user_filter_ideas(
 ) -> List[Dict[str, Any]]:
     """
     Presents the structured ideas to the user for filtering and returns the selection.
-    This function is completely rewritten to handle structured idea objects.
     """
     print("\n--- User Filtering Step ---")
     print("Review the generated ideas. The Analyst will only evaluate the ideas you keep.")
@@ -47,7 +46,6 @@ def user_filter_ideas(
         print("No ideas were generated.")
         return []
 
-    # Display ideas in a structured format
     for i, idea in enumerate(all_ideas):
         print(f"\n--- Idea [{i+1}] (from {idea.get('role', 'Unknown')}) ---")
         if brainstorm_type == 'project':
@@ -65,11 +63,9 @@ def user_filter_ideas(
         try:
             response = input("\nEnter the numbers of ideas to REMOVE, separated by commas (e.g., 2, 5, 8), or press Enter to keep all: ").strip()
             if not response:
-                return all_ideas # User wants to keep all ideas
+                return all_ideas 
 
             indices_to_remove = {int(num.strip()) - 1 for num in response.split(',')}
-            
-            # Create a new list containing only the ideas to keep
             kept_ideas = [idea for i, idea in enumerate(all_ideas) if i not in indices_to_remove]
             
             print(f"\n✅ Filtering complete. {len(kept_ideas)} ideas will be sent for evaluation.")
@@ -119,6 +115,61 @@ def select_brainstorm_type() -> str:
         else:
             print("Invalid choice. Please enter 1 or 2.")
 
+def generate_markdown_export(workflow: BrainstormingWorkflow) -> str:
+    """
+    Generates a complete markdown string of the entire brainstorming session.
+    """
+    md = []
+    md.append(f"# Brainstorm Session: {workflow.topic}")
+    md.append(f"**Type:** {workflow.brainstorm_type.replace('_', ' ').title()}")
+
+    if workflow.combined_context:
+        md.append('\n## Stage 1: Context & Team')
+        md.append('### Research Context')
+        md.append(workflow.combined_context)
+    
+    if workflow.personas:
+        md.append('\n### Assembled Agent Team')
+        for p in workflow.personas:
+            md.append(f"- **{p['Role']}**")
+            md.append(f"  - **Goal:** {p['Goal']}")
+            md.append(f"  - **Backstory:** {p['Backstory']}")
+    
+    if workflow.all_generated_ideas:
+        md.append('\n## Stage 2: Divergent Ideation')
+        md.append('### All Generated Ideas')
+        for idea in workflow.all_generated_ideas:
+            md.append(f"\n#### Idea from {idea.get('role', 'Unknown')}")
+            if workflow.brainstorm_type == 'project':
+                md.append(f"- **Idea:** {idea.get('idea', 'N/A')}")
+                md.append(f"- **Target Audience:** {idea.get('target_audience', 'N/A')}")
+                md.append(f"- **Problem Solved:** {idea.get('problem_solved', 'N/A')}")
+                md.append(f"- **Rationale:** {idea.get('rationale', 'N/A')}")
+            else: # research_paper
+                md.append(f"- **Research Question:** {idea.get('research_question', 'N/A')}")
+                md.append(f"- **Methodology:** {idea.get('potential_methodology', 'N/A')}")
+                md.append(f"- **Contribution:** {idea.get('potential_contribution', 'N/A')}")
+                md.append(f"- **Rationale:** {idea.get('rationale', 'N/A')}")
+
+    if workflow.evaluation_markdown:
+        md.append('\n## Stage 3: Convergent Evaluation')
+        md.append(workflow.evaluation_markdown)
+
+    if workflow.final_plan_text:
+        md.append('\n## Stage 4: Final Plan')
+        md.append(workflow.final_plan_text)
+
+    return '\n\n'.join(md)
+
+def save_markdown_file(filename: str, content: str):
+    """Saves the given content to a file."""
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"\n✅ Session successfully saved to '{filename}'")
+    except Exception as e:
+        print(f"\n❌ Error saving file: {e}")
+
 async def main():
     """Main function to run the brainstorming workflow."""
     print("🚀 Welcome to the AI Brainstorming Agent!")
@@ -126,7 +177,6 @@ async def main():
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         try:
-            # Fallback for Google Colab environments
             from google.colab import userdata
             api_key = userdata.get('GOOGLE_API_KEY')
         except (ImportError, KeyError):
@@ -137,7 +187,6 @@ async def main():
         return
         
     brainstorm_type = select_brainstorm_type()
-
     topic = input("Enter a topic to brainstorm: ").strip()
     if not topic:
         print("A topic is required.")
@@ -148,48 +197,50 @@ async def main():
     if pdf_path:
         pdf_text = get_pdf_text(pdf_path)
 
-    # Initialize workflow
     workflow = BrainstormingWorkflow(api_key=api_key, brainstorm_type=brainstorm_type)
-
-    # RAG + PDF Context Generation
+    
     combined_context = await workflow.run_context_generation(topic, pdf_text)
-
-    # Stage 1: Create Personas
     personas = await workflow.run_preview_agent(topic, combined_context)
-    if not personas:
-        return
+    if not personas: return
 
-    # Stage 2: Generate Structured Ideas
     await workflow.run_divergent_ideation(topic, personas, combined_context)
-    if not workflow.all_generated_ideas:
-        return
+    if not workflow.all_generated_ideas: return
 
-    # User Interaction 1: Filter ideas
     filtered_ideas = user_filter_ideas(workflow.all_generated_ideas, brainstorm_type)
     if not filtered_ideas:
         print("No ideas left after filtering. Exiting.")
         return
 
-    # Stage 3: Evaluate User-Filtered Ideas
     evaluation_result = await workflow.run_convergent_evaluation(filtered_ideas)
     top_ideas = evaluation_result.get('top_ideas')
     if not top_ideas:
         print("Could not determine top ideas from evaluation. Exiting.")
         return
         
-    # User Interaction 2: Select final idea
     chosen_idea = user_select_final_idea(top_ideas)
     if not chosen_idea:
         print("No idea selected. Exiting.")
         return
 
-    # Stage 4: Plan Implementation
     await workflow.run_implementation_planning(chosen_idea)
+    
 
+    print("\n--- Session Complete ---")
+    save_choice = input("Would you like to save the full session to a Markdown file? (Y/n): ").strip().lower()
+    if save_choice == 'y' or not save_choice:
+        print("Generating Markdown export...")
+        markdown_content = generate_markdown_export(workflow)
+        default_filename = f"brainstorm_{workflow.topic.replace(' ', '_').lower()}.md"
+        filename_prompt = f"Enter filename (default: {default_filename}): "
+        filename = input(filename_prompt).strip()
+        if not filename:
+            filename = default_filename
+        save_markdown_file(filename, markdown_content)
+    else:
+        print("Session not saved. You can run the script again to save it later.")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nProcess interrupted by user. Exiting.")
-
