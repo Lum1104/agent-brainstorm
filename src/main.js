@@ -95,6 +95,20 @@ async function callGemini(contents, generationConfig = {}) {
     }
 }
 
+function safeJSONParse(jsonString) {
+    try {
+        return JSON.parse(jsonString);
+    } catch (e) {
+        const fixed = jsonString
+            .replace(/(?<=:\s*")([^"]*?)"([^"]*?)"([^"]*?)"/g, '$1\\"$2\\"$3');
+        try {
+            return JSON.parse(fixed);
+        } catch (e2) {
+            throw e2;
+        }
+    }
+}
+
 // --- UI & WORKFLOW LOGIC ---
 function updateProgress(currentStage) {
     const progressSteps = document.querySelectorAll('.progress-step');
@@ -280,7 +294,7 @@ async function runPreviewAgent(topic, combinedContext) {
 
         const jsonString = match ? match[1] : rawResponseText;
 
-        const personaData = JSON.parse(jsonString);
+        const personaData = safeJSONParse(jsonString);
 
         hideLoader(previewAgentLoader);
         stage2Container.classList.remove('hidden');
@@ -388,7 +402,7 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
     allParsedIdeas = [];
     brainstormState.ideationOutputs = {}; // This will now store the generated MARKDOWN.
 
-    const RATE_LIMIT_DELAY = 1000;
+    const RATE_LIMIT_DELAY = 500;
     let ideaCounter = 0;
 
     for (const persona of personas) {
@@ -409,7 +423,7 @@ async function runDivergentIdeation(topic, personas, combinedContext) {
             const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
             const match = rawResponseText.match(jsonRegex);
             const jsonString = match ? match[1] : rawResponseText;
-            const ideasData = JSON.parse(jsonString);
+            const ideasData = safeJSONParse(jsonString);
             const ideasKey = brainstormType === 'project' ? 'project_ideas' : 'research_ideas';
             const ideasArray = ideasData[ideasKey];
 
@@ -532,7 +546,7 @@ toConvergentBtn.addEventListener('click', () => {
 
     stage3Container.classList.remove('hidden');
     window.scrollTo({ top: stage3Container.offsetTop, behavior: 'smooth' });
-    toConvergentBtn.classList.add('hidden');
+    // toConvergentBtn.classList.add('hidden');
     runConvergentEvaluation(rawIdeasString);
 });
 
@@ -570,7 +584,7 @@ function renderConvergentEvaluation(evaluationText) {
 
     if (jsonMatch && jsonMatch[1]) {
         try {
-            topIdeas = JSON.parse(jsonMatch[1]);
+            topIdeas = safeJSONParse(jsonMatch[1]);
             evaluationMarkdown = evaluationText.replace(jsonMatch[0], '').replace(/\s*\(\d+-\d+\)/g, '').trim();
         } catch (e) {
             console.error("Failed to parse top ideas JSON:", e);
