@@ -4,12 +4,15 @@
 import json
 import re
 import asyncio
+import datetime
+from ssl import SSLEOFError
 from typing import List, Dict, Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_community.document_loaders import ArxivLoader
 
 # Import data structures and prompts
 from .schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList, CritiqueList
@@ -26,7 +29,7 @@ class BrainstormingWorkflow:
         """
         if not api_key:
             raise ValueError("API key cannot be empty.")
-        self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=api_key, temperature=0.7)
+        self.llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.7)
         self.brainstorm_type = brainstorm_type
         
         # State variables to store the entire session for export
@@ -240,15 +243,78 @@ class BrainstormingWorkflow:
             return {}
 
     async def run_implementation_planning(self, idea: Dict[str, str]):
-        """Generates a project initiation plan or research outline for a selected idea."""
+        """Generates a project initiation plan or research outline for a selected idea, incorporating ArXiv research."""
         print(f"\n--- Stage 6: Final Document Generation for '{idea['title']}' ---")
+        
+        # search ArXiv for relevant papers for the selected idea
+        print("-> Searching ArXiv and loading papers...")
+        search_query = idea['title']
+        arxiv_context = "No relevant papers found on ArXiv for this topic."
+
+        retries = 3
+        for attempt in range(retries):
+            try:
+                arxiv_loader = ArxivLoader(query=search_query, load_max_docs=8, load_all_available_meta=True)
+                paper_documents = arxiv_loader.get_summaries_as_docs()
+                
+                if paper_documents:
+                    print(f"✅ Found {len(paper_documents)} relevant paper(s) on ArXiv. Summarizing...")
+
+                    summaries = []
+                    today = datetime.datetime.now().date()
+
+                    for doc in paper_documents:
+                        published_date = doc.metadata.get("Published", None)
+
+                        # Skip papers older than 2 years or with no publication date
+                        if published_date:
+                            if (today - published_date).days > 2 * 365:
+                                print(f"Skipping old paper: {doc.metadata.get('Title', 'Unknown')} published on {published_date}")
+                                continue
+                            print(f"Processing paper: {doc.metadata.get('Title', 'Unknown')} published on {published_date}")
+                        else:
+                            # Optional: decide if want to include papers
+                            print(f"Skipping paper with no publication date: {doc.metadata.get('Title', 'Unknown')}")
+                            continue
+
+                        title = doc.metadata.get('Title', 'N/A')
+                        if doc.page_content:
+                            summary_text = doc.page_content
+                        else:
+                            summary_text = "No abstract available"
+                        summaries.append(f"**Paper: {title}**\nAbstract: {summary_text}")
+                    
+                    if summaries:
+                        arxiv_context = "**Relevant Research from ArXiv:**\n\n" + "\n\n---\n\n".join(summaries)
+                        print("✅ Summarization complete.")
+                    else:
+                        print("-> No recent relevant ArXiv papers found.")
+
+                else:
+                    print("-> No relevant ArXiv papers found.")
+                break  # Exit loop if successful
+
+            except Exception as e:
+                if isinstance(e, ConnectionError) or isinstance(e, TimeoutError) or isinstance(e, SSLEOFError):
+                    print(f"⚠️ Attempt {attempt + 1} failed due to connection issues: {e}. Retrying...")
+                else:
+                    arxiv_context = "No relevant papers found on ArXiv for this topic."
+                    print(f"❌ Error during ArXiv processing: {e}")
+
         parser = StrOutputParser()
         template = self.planning_prompts[self.brainstorm_type]
-        prompt = PromptTemplate.from_template(template)
+        prompt = PromptTemplate(
+            template=template,
+            input_variables=["title", "description", "arxiv_context"]
+        )
         chain = prompt | self.llm | parser
         try:
-            plan_text = await chain.ainvoke({"title": idea['title'], "description": idea['description']})
-            self.final_plan_text = plan_text 
+            plan_text = await chain.ainvoke({
+                "title": idea['title'], 
+                "description": idea['description'],
+                "arxiv_context": arxiv_context
+            })
+            self.final_plan_text = plan_text + "\n\n---\n\n" + arxiv_context
             
             markdown_plan = self.final_plan_text
             mermaid_chart = ""

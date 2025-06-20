@@ -104,13 +104,18 @@ Raw Ideas & Critiques:
 }
 
 planning_prompts = {
-    'project': """You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title and description.
+    'project': """You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title, description, and recent academic research.
 
 **Selected Idea:**
 - **Title:** {title}
 - **Description:** {description}
 
-Please structure your response in Markdown with the following sections:
+**Context from Academic Research (ArXiv):**
+{arxiv_context}
+
+---
+
+Please structure your response in Markdown with the following sections, integrating insights from the ArXiv context where relevant:
 
 ### 1. Project Overview & Business Case
 * **Inferred Business Domain:** Based on the title and description, first identify the specific business domain or industry this project belongs to (e.g., FinTech - Algorithmic Trading, Healthcare - Diagnostic AI, E-commerce - Recommendation Systems).
@@ -136,13 +141,18 @@ Please structure your response in Markdown with the following sections:
 
 Finally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"].
 """,
-    'research_paper': """You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline based on the provided title and description.
+    'research_paper': """You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline, informed by existing literature.
 
 **Selected Research Question:**
 - **Title:** {title}
 - **Description:** {description}
 
-Please structure your response in Markdown with the following sections:
+**Context from Recent Literature (ArXiv):**
+{arxiv_context}
+
+---
+
+Please structure your response in Markdown with the following sections, making sure to position your proposed research in relation to the existing work from ArXiv:
 
 ### 1. Inferred Research Field & Problem Statement
 * **Inferred Field:** Based on the title and description, first identify and state the specific academic field and sub-field this research belongs to (e.g., Computer Science - Natural Language Processing, Sociology - Urban Studies, Bioinformatics, etc.).
