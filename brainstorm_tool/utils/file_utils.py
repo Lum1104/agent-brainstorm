@@ -1,8 +1,7 @@
 # file_utils.py
 # This file contains utility functions for file I/O and data handling.
 
-from typing import Optional
-from ..agents.workflow import BrainstormingWorkflow
+from typing import Optional, Dict, Any
 
 # Try to import pypdf, but handle the case where it's not installed.
 try:
@@ -33,33 +32,34 @@ def get_pdf_text(pdf_path: str) -> Optional[str]:
         print(f"❌ An error occurred while reading the PDF: {e}")
         return None
 
-def generate_markdown_export(workflow: BrainstormingWorkflow) -> str:
+def generate_markdown_export(state: Dict[str, Any]) -> str:
     """
-    Generates a complete markdown string of the entire brainstorming session.
+    Generates a complete markdown string of the entire brainstorming session
+    from the final graph state.
     """
     md = []
-    md.append(f"# Brainstorm Session: {workflow.topic}")
-    md.append(f"**Type:** {workflow.brainstorm_type.replace('_', ' ').title()}")
+    md.append(f"# Brainstorm Session: {state.get('topic', 'N/A')}")
+    md.append(f"**Type:** {state.get('brainstorm_type', '').replace('_', ' ').title()}")
 
-    if workflow.combined_context:
+    if state.get('combined_context'):
         md.append('\n## Stage 1: Context & Team')
         md.append('### Research Context')
-        md.append(workflow.combined_context)
+        md.append(state['combined_context'])
     
-    if workflow.personas:
+    if state.get('personas'):
         md.append('\n### Assembled Agent Team')
-        for p in workflow.personas:
+        for p in state['personas']:
             md.append(f"- **{p['Role']}**")
             md.append(f"  - **Goal:** {p['Goal']}")
             md.append(f"  - **Backstory:** {p['Backstory']}")
     
-    if workflow.all_generated_ideas:
+    if state.get('all_generated_ideas'):
         md.append('\n## Stage 2: Divergent Ideation')
-        md.append('### All Generated Ideas')
-        for idea in workflow.all_generated_ideas:
+        md.append('### All Generated Ideas (Pre-Filtering)')
+        for idea in state['all_generated_ideas']:
             md.append(f"\n#### Idea from {idea.get('role', 'Unknown')}")
             title = idea.get('idea') or idea.get('research_question', 'Untitled')
-            if workflow.brainstorm_type == 'project':
+            if state.get('brainstorm_type') == 'project':
                 md.append(f"- **Idea:** {idea.get('idea', 'N/A')}")
                 md.append(f"- **Target Audience:** {idea.get('target_audience', 'N/A')}")
                 md.append(f"- **Problem Solved:** {idea.get('problem_solved', 'N/A')}")
@@ -69,19 +69,20 @@ def generate_markdown_export(workflow: BrainstormingWorkflow) -> str:
                 md.append(f"- **Contribution:** {idea.get('potential_contribution', 'N/A')}")
             md.append(f"- **Rationale:** {idea.get('rationale', 'N/A')}")
 
-            # Include the critique in the export
-            matching_critique = next((c['critique'] for c in workflow.critiques if c['idea_title'] == title), None)
-            if matching_critique:
-                md.append(f"- **🔥 Red Team Critique:** {matching_critique}")
+            # Include the critique in the export, if it exists for this idea
+            if state.get('critiques'):
+                    matching_critique = next((c['critique'] for c in state['critiques'] if c['idea_title'] == title), None)
+                    if matching_critique:
+                        md.append(f"- **🔥 Red Team Critique:** {matching_critique}")
 
 
-    if workflow.evaluation_markdown:
+    if state.get('evaluation_markdown'):
         md.append('\n## Stage 3: Convergent Evaluation')
-        md.append(workflow.evaluation_markdown)
+        md.append(state['evaluation_markdown'])
 
-    if workflow.final_plan_text:
+    if state.get('final_plan_text'):
         md.append('\n## Stage 4: Final Plan')
-        md.append(workflow.final_plan_text)
+        md.append(state['final_plan_text'])
 
     return '\n\n'.join(md)
 
