@@ -43,6 +43,8 @@ class GraphState(TypedDict):
         top_ideas: The top ideas selected by the analyst agent.
         chosen_idea: The final idea selected by the user for planning.
         final_plan_text: The final project plan or research outline.
+        use_arxiv_search: A boolean indicating whether to use ArXiv search.
+        user_plan_feedback: User's feedback on the generated plan.
 """
     api_key: str
     llm: ChatGoogleGenerativeAI
@@ -58,6 +60,9 @@ class GraphState(TypedDict):
     top_ideas: List[Dict]
     chosen_idea: Optional[Dict]
     final_plan_text: str
+    use_arxiv_search: bool
+    user_plan_feedback: Optional[str]
+    arxiv_context: str
 
 # --- Conditional Edge Function ---
 def route_pdf_input(state: GraphState) -> str:
@@ -294,6 +299,50 @@ async def user_select_idea_node(state: GraphState) -> Dict[str, Any]:
         print("⚠️ Invalid input. Could not parse number. Selecting the first idea by default.")
         return {"chosen_idea": top_ideas[0]}    
 
+async def ask_for_arxiv_search_node(state: GraphState) -> Dict[str, Any]:
+    """Interrupts to ask the user if they want to perform an ArXiv search."""
+    use_arxiv = interrupt(
+        {
+            "message": "\nDo you want to include a search for relevant ArXiv papers in the final plan? (Y/n): "
+        }
+    )
+    if use_arxiv.strip().lower() == "y" or not use_arxiv.strip():
+        return {"use_arxiv_search": True}
+    else:
+        return {"use_arxiv_search": False}
+
+
+async def arxiv_search_node(state: GraphState) -> Dict[str, Any]:
+    """Search relevant paper on ArXiv"""
+    idea = state['chosen_idea']
+    arxiv_context = "No relevant papers found on ArXiv for this topic."
+    
+    if not idea:
+        return {"arxiv_context": arxiv_context}
+
+    search_query = idea['title']
+
+    print("\n--- 📚 Searching ArXiv for relevant papers... ---")
+    
+    try:
+        arxiv_loader = ArxivLoader(query=search_query, load_max_docs=8, load_all_available_meta=True)
+        paper_documents = arxiv_loader.get_summaries_as_docs()
+        
+        if paper_documents:
+            summaries = []
+            today = datetime.datetime.now().date()
+            for doc in paper_documents:
+                published_date = doc.metadata.get("Published")
+                if published_date and (today - published_date).days <= 2 * 365:
+                    summaries.append(f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace("\n", " ") or 'N/A'}")
+            
+            if summaries:
+                arxiv_context = "**Relevant Research from ArXiv:**\n\n" + "\n\n---\n\n".join(summaries)
+    except Exception as e:
+        print(f"❌ Error during ArXiv search: {e}")
+
+    return {"arxiv_context": arxiv_context}
+
 async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
     """Runs a 'Red Team' agent to critique a list of ideas."""
     print("\n--- 🛡️ Red Team Critique Node ---")
@@ -401,30 +450,10 @@ async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
     idea = state['chosen_idea']
     brainstorm_type = state['brainstorm_type']
     llm = state['llm']
-    
+    arxiv_context = state['arxiv_context']
+
     if not idea:
         return {"final_plan_text": "No idea chosen for planning."}
-
-    search_query = idea['title']
-    arxiv_context = "No relevant papers found on ArXiv for this topic."
-
-    try:
-        arxiv_loader = ArxivLoader(query=search_query, load_max_docs=8, load_all_available_meta=True)
-        paper_documents = arxiv_loader.get_summaries_as_docs()
-        
-        if paper_documents:
-            summaries = []
-            today = datetime.datetime.now().date()
-            for doc in paper_documents:
-                published_date = doc.metadata.get("Published")
-                if published_date and (today - published_date).days <= 2 * 365:
-                    summaries.append(f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace("\n", " ") or 'N/A'}")
-            
-            if summaries:
-                arxiv_context = "**Relevant Research from ArXiv:**\n\n" + "\n\n---\n\n".join(summaries)
-    except Exception as e:
-        print(f"❌ Error during ArXiv search: {e}")
-
     parser = StrOutputParser()
     template = planning_prompts[brainstorm_type]
     prompt = PromptTemplate(template=template, input_variables=["title", "description", "arxiv_context"])
@@ -456,6 +485,35 @@ async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
         return {"final_plan_text": "Error during plan generation."}
 
 
+async def user_feedback_on_plan_node(state: GraphState) -> Dict[str, Any]:
+    """Interrupts to ask the user for feedback on the generated plan."""
+    print("\n--- ⏸️ User Input Required: Plan Review ---")
+    print("Please review the generated plan. Do you approve it, or would you like to select a different idea?")
+    
+    feedback = interrupt(
+        {
+            "message": "Type 'Y' to finish, or 'R' to go back to the idea selection screen: "
+        }
+    )
+    
+    return {"user_plan_feedback": feedback.strip().lower()}
+
+
+def route_after_plan_feedback(state: GraphState) -> str:
+    """Determines the next step after user feedback on the plan."""
+    if state.get("user_plan_feedback") == "r":
+        return "user_select_idea"
+    else: # approve or anything else
+        return "END"
+
+
+def route_arxiv_search_feedback(state: GraphState) -> str:
+    """Determines if using ArXiv search."""
+    if state.get("use_arxiv_search"):
+        return "arxiv_search"
+    else:
+        return "implementation_planning"
+
 # --- Graph Builder ---
 def build_graph(checkpointer: InMemorySaver):
     """Builds the LangGraph agent graph."""
@@ -471,7 +529,10 @@ def build_graph(checkpointer: InMemorySaver):
     workflow.add_node("red_team_critique", red_team_critique_node)
     workflow.add_node("convergent_evaluation", convergent_evaluation_node)
     workflow.add_node("user_select_idea", user_select_idea_node)
+    workflow.add_node("ask_for_arxiv_search", ask_for_arxiv_search_node)
+    workflow.add_node("arxiv_search", arxiv_search_node)
     workflow.add_node("implementation_planning", implementation_planning_node)
+    workflow.add_node("user_feedback_on_plan", user_feedback_on_plan_node)
 
     # Define edges
     workflow.set_entry_point("ask_for_pdf_path")
@@ -490,8 +551,26 @@ def build_graph(checkpointer: InMemorySaver):
     workflow.add_edge("user_filter_ideas", "red_team_critique")
     workflow.add_edge("red_team_critique", "convergent_evaluation")
     workflow.add_edge("convergent_evaluation", "user_select_idea")
-    workflow.add_edge("user_select_idea", "implementation_planning")
-    workflow.add_edge("implementation_planning", END)
+    workflow.add_edge("user_select_idea", "ask_for_arxiv_search")
+    workflow.add_edge("arxiv_search", "implementation_planning")
+    workflow.add_edge("implementation_planning", "user_feedback_on_plan")
+    
+    workflow.add_conditional_edges(
+        "user_feedback_on_plan",
+        route_after_plan_feedback,
+        {
+            "user_select_idea": "user_select_idea",
+            "END": END
+        }
+    )
+    workflow.add_conditional_edges(
+        "ask_for_arxiv_search",
+        route_arxiv_search_feedback,
+        {
+            "arxiv_search": "arxiv_search",
+            "implementation_planning": "implementation_planning"
+        }
+    )
     
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)

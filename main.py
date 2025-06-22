@@ -47,6 +47,7 @@ async def main_async():
     # 2. --- Build and Compile the Graph ---
     checkpointer = InMemorySaver()
     app = build_graph(checkpointer)
+    print(app.get_graph().draw_mermaid())
 
     # 3. --- Run the Graph Stream ---
     initial_state: GraphState = {
@@ -64,6 +65,9 @@ async def main_async():
         "top_ideas": [],
         "chosen_idea": None,
         "final_plan_text": "",
+        "arxiv_context": "No relevant papers found on ArXiv for this topic.",
+        "use_arxiv_search": True,
+        "user_plan_feedback": ""
     }
     
     config = {"configurable": {"thread_id": "brainstorm-thread-v2"}} # Using a new thread ID
@@ -75,7 +79,7 @@ async def main_async():
             result = await app.ainvoke(Command(resume=value), config=config)
     except Exception as e:
         print(f"\nAn error occurred during graph execution: {e}")
-    print(result)
+
 
     # 4. --- Save Results ---
     if "final_plan_text" in result:
