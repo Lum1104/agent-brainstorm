@@ -13,7 +13,7 @@
 ## 快速上手
 
 ### 环境要求
-- Python 3.10 或更高版本
+- Python 3.12 或更高版本
 - Google Gemini API 密钥 (可从 [Google AI Studio](https://aistudio.google.com/apikey) 免费获取)
 
 ### 安装设置
@@ -21,7 +21,7 @@
 git clone https://github.com/Lum1104/agent-brainstorm.git
 cd agent-brainstorm
 
-conda create -n brainstorm python=3.10
+conda create -n brainstorm python=3.12
 conda activate brainstorm
 
 pip install -r requirements.txt

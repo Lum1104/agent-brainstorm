@@ -13,7 +13,7 @@ This system implements a 5-stage brainstorming methodology using AI agents to ge
 ## Getting Started
 
 ### Prerequisites
-- Python 3.10 or higher
+- Python 3.12 or higher
 - Google Gemini API Key (free from [Google AI Studio](https://aistudio.google.com/apikey))
 
 ### Installation
@@ -21,7 +21,7 @@ This system implements a 5-stage brainstorming methodology using AI agents to ge
 git clone https://github.com/Lum1104/agent-brainstorm.git
 cd agent-brainstorm
 
-conda create -n brainstorm python=3.10
+conda create -n brainstorm python=3.12
 conda activate brainstorm
 
 pip install -r requirements.txt

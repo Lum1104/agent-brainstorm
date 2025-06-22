@@ -5,6 +5,7 @@ import json
 import re
 import asyncio
 import datetime
+import pypdf
 from typing import List, Dict, Any, TypedDict, Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -15,7 +16,6 @@ from langchain_community.document_loaders import ArxivLoader
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import interrupt
-from regex import P
 
 
 from .schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList, CritiqueList
@@ -59,8 +59,51 @@ class GraphState(TypedDict):
     chosen_idea: Optional[Dict]
     final_plan_text: str
 
+# --- Conditional Edge Function ---
+def route_pdf_input(state: GraphState) -> str:
+    """Determines the next node based on whether a PDF path was provided."""
+    if state.get("pdf_text"):
+        return "process_pdf"
+    else:
+        return "context_generation"
 
 # --- Node Functions ---
+async def ask_for_pdf_path_node(state: GraphState) -> Dict[str, Any]:
+    """Interrupts to ask the user for a PDF path or to skip."""
+    pdf_path = interrupt(
+        {
+            "message": "Optional: Enter the full path to a PDF file for context, or press Enter to skip: "
+        }
+    )
+    return {"pdf_text": pdf_path.strip() if pdf_path else None}
+
+
+async def process_pdf_node(state: GraphState) -> Dict[str, Any]:
+    """Extracts text from the PDF path provided in the state."""
+    pdf_path = state.get("pdf_text")
+    print(f"\n--- 📄 Processing PDF: {pdf_path} ---")
+    try:
+        with open(pdf_path, 'rb') as f:
+            reader = pypdf.PdfReader(f)
+            pdf_text = ""
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    pdf_text += extracted + "\n\n"
+        if pdf_text:
+            print("✅ PDF text successfully extracted.")
+            return {"pdf_text": pdf_text}
+        else:
+            print("⚠️ Could not extract text from PDF. Continuing without it.")
+            return {"pdf_text": None}
+    except FileNotFoundError:
+        print(f"❌ Error: The file '{pdf_path}' was not found. Continuing without it.")
+        return {"pdf_text": None}
+    except Exception as e:
+        print(f"❌ An error occurred while reading the PDF: {e}. Continuing without it.")
+        return {"pdf_text": None}
+
+
 async def context_generation_node(state: GraphState) -> Dict[str, Any]:
     """
     Generates a combined context from a web search and an optional user-provided PDF.
@@ -214,6 +257,7 @@ async def user_filter_ideas_node(state: GraphState) -> Dict[str, Any]:
         # that loops back if validation fails.
         print("⚠️ Invalid input. Could not parse numbers. Keeping all ideas.")
         return {"filtered_ideas": all_ideas}
+
 
 async def user_select_idea_node(state: GraphState) -> Dict[str, Any]:
     """
@@ -374,7 +418,7 @@ async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
             for doc in paper_documents:
                 published_date = doc.metadata.get("Published")
                 if published_date and (today - published_date).days <= 2 * 365:
-                    summaries.append(f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content or 'N/A'}")
+                    summaries.append(f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace("\n", " ") or 'N/A'}")
             
             if summaries:
                 arxiv_context = "**Relevant Research from ArXiv:**\n\n" + "\n\n---\n\n".join(summaries)
@@ -418,6 +462,8 @@ def build_graph(checkpointer: InMemorySaver):
     workflow = StateGraph(GraphState)
 
     # Add nodes
+    workflow.add_node("ask_for_pdf_path", ask_for_pdf_path_node)
+    workflow.add_node("process_pdf", process_pdf_node)
     workflow.add_node("context_generation", context_generation_node)
     workflow.add_node("persona_generation", persona_generation_node)
     workflow.add_node("divergent_ideation", divergent_ideation_node)
@@ -428,7 +474,16 @@ def build_graph(checkpointer: InMemorySaver):
     workflow.add_node("implementation_planning", implementation_planning_node)
 
     # Define edges
-    workflow.set_entry_point("context_generation")
+    workflow.set_entry_point("ask_for_pdf_path")
+    workflow.add_conditional_edges(
+        "ask_for_pdf_path",
+        route_pdf_input,
+        {
+            "process_pdf": "process_pdf",
+            "context_generation": "context_generation"
+        }
+    )
+    workflow.add_edge("process_pdf", "context_generation")
     workflow.add_edge("context_generation", "persona_generation")
     workflow.add_edge("persona_generation", "divergent_ideation")
     workflow.add_edge("divergent_ideation", "user_filter_ideas")

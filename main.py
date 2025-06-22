@@ -14,7 +14,6 @@ from brainstorm_tool.utils.ui import (
     select_brainstorm_type,
 )
 from brainstorm_tool.utils.file_utils import (
-    get_pdf_text,
     generate_markdown_export,
     save_markdown_file
 )
@@ -44,10 +43,6 @@ async def main_async():
         print("A topic is required. Exiting.")
         return
 
-    pdf_text = None
-    pdf_path = prompt_user_input("Enter the path to a PDF for extra context, or press Enter to skip: ")
-    if pdf_path:
-        pdf_text = get_pdf_text(pdf_path)
 
     # 2. --- Build and Compile the Graph ---
     checkpointer = InMemorySaver()
@@ -59,7 +54,7 @@ async def main_async():
         "llm": llm,
         "topic": topic,
         "brainstorm_type": brainstorm_type,
-        "pdf_text": pdf_text,
+        "pdf_text": None,
         "combined_context": "",
         "personas": [],
         "all_generated_ideas": [],
