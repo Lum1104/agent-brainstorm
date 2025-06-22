@@ -4,17 +4,54 @@
 
 **立即试用：** [https://lum1104.github.io/agent-brainstorm/](https://lum1104.github.io/agent-brainstorm/)
 
+**案例：** [从 Emotion-LLaMA 启发的 idea](./example.md)
+
 一个基于 Python 的 AI 智能体系统，利用 Google 的 Gemini API，通过多个 AI 角色来促进结构化的头脑风暴会议。该系统作为命令行应用程序运行，具有交互式工作流程。
 
 ## 概述
 
 该系统通过 AI 智能体实现了一个 5 阶段的头脑风暴方法论，用于生成、评估和完善项目开发和学术论文的创意。整个过程在本地运行，具有实时网络搜索集成和 ArXiv 研究功能。
 
-## 快速上手
+```mermaid
+graph TD;
+        __start__([<p>__start__</p>]):::first
+        ask_for_pdf_path(ask_for_pdf_path)
+        process_pdf(process_pdf)
+        context_generation(context_generation)
+        persona_generation(persona_generation)
+        divergent_ideation(divergent_ideation)
+        user_filter_ideas(user_filter_ideas)
+        red_team_critique(red_team_critique)
+        convergent_evaluation(convergent_evaluation)
+        user_select_idea(user_select_idea)
+        ask_for_arxiv_search(ask_for_arxiv_search)
+        arxiv_search(arxiv_search)
+        implementation_planning(implementation_planning)
+        user_feedback_on_plan(user_feedback_on_plan)
+        __end__([<p>__end__</p>]):::last
+        __start__ --> ask_for_pdf_path;
+        arxiv_search --> implementation_planning;
+        ask_for_arxiv_search -.-> arxiv_search;
+        ask_for_arxiv_search -.-> implementation_planning;
+        ask_for_pdf_path -.-> context_generation;
+        ask_for_pdf_path -.-> process_pdf;
+        context_generation --> persona_generation;
+        convergent_evaluation --> user_select_idea;
+        divergent_ideation --> user_filter_ideas;
+        implementation_planning --> user_feedback_on_plan;
+        persona_generation --> divergent_ideation;
+        process_pdf --> context_generation;
+        red_team_critique --> convergent_evaluation;
+        user_feedback_on_plan -. &nbsp;END&nbsp; .-> __end__;
+        user_feedback_on_plan -.-> user_select_idea;
+        user_filter_ideas --> red_team_critique;
+        user_select_idea --> ask_for_arxiv_search;
+        classDef default fill:#f2f0ff,line-height:1.2
+        classDef first fill-opacity:0
+        classDef last fill:#bfb6fc
+```
 
-### 环境要求
-- Python 3.12 或更高版本
-- Google Gemini API 密钥 (可从 [Google AI Studio](https://aistudio.google.com/apikey) 免费获取)
+## 快速上手
 
 ### 安装设置
 ```bash

@@ -335,9 +335,12 @@ async def arxiv_search_node(state: GraphState) -> Dict[str, Any]:
                 published_date = doc.metadata.get("Published")
                 if published_date and (today - published_date).days <= 2 * 365:
                     summaries.append(f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace("\n", " ") or 'N/A'}")
+                else:
+                    print(f"Skipping paper '{doc.metadata.get('Title', 'N/A')}' published on {published_date} (older than 2 years)")
             
             if summaries:
                 arxiv_context = "**Relevant Research from ArXiv:**\n\n" + "\n\n---\n\n".join(summaries)
+                print(arxiv_context)
     except Exception as e:
         print(f"❌ Error during ArXiv search: {e}")
 

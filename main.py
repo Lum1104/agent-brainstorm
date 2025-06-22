@@ -35,7 +35,7 @@ async def main_async():
         print("A Google API Key is required. Exiting.")
         return
 
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=api_key, temperature=0.7)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.7)
     
     brainstorm_type = select_brainstorm_type()
     topic = prompt_user_input("Enter a topic to brainstorm: ")
@@ -47,7 +47,7 @@ async def main_async():
     # 2. --- Build and Compile the Graph ---
     checkpointer = InMemorySaver()
     app = build_graph(checkpointer)
-    print(app.get_graph().draw_mermaid())
+    # print(app.get_graph().draw_mermaid())
 
     # 3. --- Run the Graph Stream ---
     initial_state: GraphState = {

@@ -4,17 +4,54 @@
 
 **Try it now:** [https://lum1104.github.io/agent-brainstorm/](https://lum1104.github.io/agent-brainstorm/)
 
+**Example of Brainstorm:** [Idea inspired by Emotion-LLaMA](./example.md)
+
 A Python-based AI agent system that utilizes Google's Gemini API to facilitate structured brainstorming sessions through multiple AI personas. The system runs as a command-line application with an interactive workflow.
 
 ## Overview
 
 This system implements a 5-stage brainstorming methodology using AI agents to generate, evaluate, and refine ideas for both project development and research papers. The entire process runs locally with real-time web search integration and ArXiv research capabilities.
 
-## Getting Started
+```mermaid
+graph TD;
+        __start__([<p>__start__</p>]):::first
+        ask_for_pdf_path(ask_for_pdf_path)
+        process_pdf(process_pdf)
+        context_generation(context_generation)
+        persona_generation(persona_generation)
+        divergent_ideation(divergent_ideation)
+        user_filter_ideas(user_filter_ideas)
+        red_team_critique(red_team_critique)
+        convergent_evaluation(convergent_evaluation)
+        user_select_idea(user_select_idea)
+        ask_for_arxiv_search(ask_for_arxiv_search)
+        arxiv_search(arxiv_search)
+        implementation_planning(implementation_planning)
+        user_feedback_on_plan(user_feedback_on_plan)
+        __end__([<p>__end__</p>]):::last
+        __start__ --> ask_for_pdf_path;
+        arxiv_search --> implementation_planning;
+        ask_for_arxiv_search -.-> arxiv_search;
+        ask_for_arxiv_search -.-> implementation_planning;
+        ask_for_pdf_path -.-> context_generation;
+        ask_for_pdf_path -.-> process_pdf;
+        context_generation --> persona_generation;
+        convergent_evaluation --> user_select_idea;
+        divergent_ideation --> user_filter_ideas;
+        implementation_planning --> user_feedback_on_plan;
+        persona_generation --> divergent_ideation;
+        process_pdf --> context_generation;
+        red_team_critique --> convergent_evaluation;
+        user_feedback_on_plan -. &nbsp;END&nbsp; .-> __end__;
+        user_feedback_on_plan -.-> user_select_idea;
+        user_filter_ideas --> red_team_critique;
+        user_select_idea --> ask_for_arxiv_search;
+        classDef default fill:#f2f0ff,line-height:1.2
+        classDef first fill-opacity:0
+        classDef last fill:#bfb6fc
+```
 
-### Prerequisites
-- Python 3.12 or higher
-- Google Gemini API Key (free from [Google AI Studio](https://aistudio.google.com/apikey))
+## Getting Started
 
 ### Installation
 ```bash
