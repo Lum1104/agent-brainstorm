@@ -4,6 +4,7 @@ import pypdf
 import datetime
 from pathlib import Path
 from typing import Dict, Any
+import asyncio
 
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -69,7 +70,47 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
     llm = state["llm"]
 
     search = DuckDuckGoSearchRun()
-    search_results = search.run(topic)
+
+    concept_extractor_prompt = PromptTemplate.from_template(
+        "You are a research assistant. Your task is to deconstruct the user's topic into a list of 3-5 core, searchable concepts or keywords. "
+        "These concepts should be fundamental to understanding the topic. "
+        "Return these concepts as a single, comma-separated string. Do not add any preamble or explanation.\n\n"
+        "Topic: {topic}\n\n"
+        "Keywords:"
+    )
+    concept_extractor_chain = concept_extractor_prompt | llm | StrOutputParser()
+
+    try:
+        # Get the comma-separated list of concepts from the LLM
+        concepts_str = await concept_extractor_chain.ainvoke({"topic": topic})
+        search_concepts = [
+            concept.strip() for concept in concepts_str.split(",") if concept.strip()
+        ]
+        print(f"--- 🔍 Identified concepts for search: {search_concepts} ---")
+    except Exception as e:
+        print(f"❌ Error during concept extraction: {e}")
+        search_concepts = [topic]
+
+    all_search_results = []
+    for concept in search_concepts:
+        while True:
+            try:
+                search_results = search.run(concept)
+                if search_results:
+                    all_search_results.append(search_results)
+                    print(f"✅ Found results for concept '{concept}'.")
+                else:
+                    print(f"⚠️ No results found for concept '{concept}'.")
+                break
+            except Exception as e:
+                if "Ratelimit" in str(e):
+                    print("⚠️ Rate limit reached. Retrying after a short delay...")
+                    await asyncio.sleep(3)
+                else:
+                    print(f"❌ Error during concept extraction: {e}")
+                    break
+
+    web_context = "\n\n".join(all_search_results)
 
     summarizer_prompt = PromptTemplate.from_template(
         "You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text. Focus on key concepts, definitions, and the current state of the topic.\nText:\n---\n{text_to_summarize}\n---\n\nProvide your summary in a single, dense paragraph."
@@ -77,9 +118,7 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
     summarizer_chain = summarizer_prompt | llm | StrOutputParser()
 
     try:
-        web_summary = await summarizer_chain.ainvoke(
-            {"text_to_summarize": search_results}
-        )
+        web_summary = await summarizer_chain.ainvoke({"text_to_summarize": web_context})
         combined_context = f"**Web Search Summary:**\n{web_summary}"
 
         if pdf_text:
