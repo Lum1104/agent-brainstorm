@@ -1,4 +1,3 @@
-# workflow.py
 # This file defines the core logic for the brainstorming process using LangGraph.
 
 import json
@@ -6,6 +5,7 @@ import re
 import asyncio
 import datetime
 import pypdf
+from pathlib import Path
 from typing import List, Dict, Any, TypedDict, Optional
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -18,11 +18,25 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import interrupt
 
 
-from .schemas import PersonaList, TopIdeasList, ProjectIdeasList, ResearchIdeasList, CritiqueList
-from .prompts import persona_prompts, ideation_prompts, evaluation_prompts, planning_prompts, red_team_prompts
+from .schemas import (
+    PersonaList,
+    TopIdeasList,
+    ProjectIdeasList,
+    ResearchIdeasList,
+    CritiqueList,
+)
+from .prompts import (
+    persona_prompts,
+    ideation_prompts,
+    evaluation_prompts,
+    planning_prompts,
+    red_team_prompts,
+    collaborative_discussion_prompts,
+)
 
 
 # --- Graph State Definition ---
+
 
 class GraphState(TypedDict):
     """
@@ -45,7 +59,8 @@ class GraphState(TypedDict):
         final_plan_text: The final project plan or research outline.
         use_arxiv_search: A boolean indicating whether to use ArXiv search.
         user_plan_feedback: User's feedback on the generated plan.
-"""
+    """
+
     api_key: str
     llm: ChatGoogleGenerativeAI
     topic: str
@@ -64,6 +79,7 @@ class GraphState(TypedDict):
     user_plan_feedback: Optional[str]
     arxiv_context: str
 
+
 # --- Conditional Edge Function ---
 def route_pdf_input(state: GraphState) -> str:
     """Determines the next node based on whether a PDF path was provided."""
@@ -71,6 +87,7 @@ def route_pdf_input(state: GraphState) -> str:
         return "process_pdf"
     else:
         return "context_generation"
+
 
 # --- Node Functions ---
 async def ask_for_pdf_path_node(state: GraphState) -> Dict[str, Any]:
@@ -86,9 +103,12 @@ async def ask_for_pdf_path_node(state: GraphState) -> Dict[str, Any]:
 async def process_pdf_node(state: GraphState) -> Dict[str, Any]:
     """Extracts text from the PDF path provided in the state."""
     pdf_path = state.get("pdf_text")
+    if pdf_path.startswith("~"):
+        pdf_path = pdf_path.replace("~", str(Path.home()), 1)
+    print(f"📄 PDF path provided: {pdf_path}")
     print(f"\n--- 📄 Processing PDF: {pdf_path} ---")
     try:
-        with open(pdf_path, 'rb') as f:
+        with open(pdf_path, "rb") as f:
             reader = pypdf.PdfReader(f)
             pdf_text = ""
             for page in reader.pages:
@@ -105,7 +125,9 @@ async def process_pdf_node(state: GraphState) -> Dict[str, Any]:
         print(f"❌ Error: The file '{pdf_path}' was not found. Continuing without it.")
         return {"pdf_text": None}
     except Exception as e:
-        print(f"❌ An error occurred while reading the PDF: {e}. Continuing without it.")
+        print(
+            f"❌ An error occurred while reading the PDF: {e}. Continuing without it."
+        )
         return {"pdf_text": None}
 
 
@@ -114,26 +136,32 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
     Generates a combined context from a web search and an optional user-provided PDF.
     """
     print("\n--- 🌐 Context Generation Node ---")
-    topic = state['topic']
-    pdf_text = state.get('pdf_text')
-    llm = state['llm']
-    
+    topic = state["topic"]
+    pdf_text = state.get("pdf_text")
+    llm = state["llm"]
+
     search = DuckDuckGoSearchRun()
     search_results = search.run(topic)
-    
+
     summarizer_prompt = PromptTemplate.from_template(
         "You are a Research Analyst. Your task is to provide a concise, neutral summary of the following text. Focus on key concepts, definitions, and the current state of the topic.\nText:\n---\n{text_to_summarize}\n---\n\nProvide your summary in a single, dense paragraph."
     )
     summarizer_chain = summarizer_prompt | llm | StrOutputParser()
 
     try:
-        web_summary = await summarizer_chain.ainvoke({"text_to_summarize": search_results})
+        web_summary = await summarizer_chain.ainvoke(
+            {"text_to_summarize": search_results}
+        )
         combined_context = f"**Web Search Summary:**\n{web_summary}"
 
         if pdf_text:
-            pdf_summary = await summarizer_chain.ainvoke({"text_to_summarize": pdf_text})
-            combined_context += f"\n\n---\n\n**Uploaded Document Context:**\n{pdf_summary}"
-        
+            pdf_summary = await summarizer_chain.ainvoke(
+                {"text_to_summarize": pdf_text}
+            )
+            combined_context += (
+                f"\n\n---\n\n**Uploaded Document Context:**\n{pdf_summary}"
+            )
+
         print("\n--- Combined Context Summary ---")
         print(combined_context)
         return {"combined_context": combined_context}
@@ -145,10 +173,10 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
 async def persona_generation_node(state: GraphState) -> Dict[str, Any]:
     """Generates a team of distinct expert personas for a given topic."""
     print("\n--- 🧑‍💼 Persona Generation Node ---")
-    topic = state['topic']
-    combined_context = state['combined_context']
-    brainstorm_type = state['brainstorm_type']
-    llm = state['llm']
+    topic = state["topic"]
+    combined_context = state["combined_context"]
+    brainstorm_type = state["brainstorm_type"]
+    llm = state["llm"]
 
     parser = JsonOutputParser(pydantic_object=PersonaList)
     template = persona_prompts[brainstorm_type]
@@ -159,10 +187,14 @@ async def persona_generation_node(state: GraphState) -> Dict[str, Any]:
     )
     chain = prompt | llm | parser
     try:
-        response = await chain.ainvoke({"topic": topic, "combined_context": combined_context})
-        personas = response['personas']
+        response = await chain.ainvoke(
+            {"topic": topic, "combined_context": combined_context}
+        )
+        personas = response["personas"]
         for p in personas:
-            print(f"- Role: {p['Role']}\n  Goal: {p['Goal']}\n  Backstory: {p['Backstory']}\n")
+            print(
+                f"- Role: {p['Role']}\n  Goal: {p['Goal']}\n  Backstory: {p['Backstory']}\n"
+            )
         return {"personas": personas}
     except Exception as e:
         print(f"❌ Error in Persona Generation Node: {e}")
@@ -172,36 +204,42 @@ async def persona_generation_node(state: GraphState) -> Dict[str, Any]:
 async def divergent_ideation_node(state: GraphState) -> Dict[str, Any]:
     """Generates a wide range of ideas from the perspective of each persona."""
     print("\n--- 💡 Divergent Ideation Node ---")
-    topic = state['topic']
-    personas = state['personas']
-    combined_context = state['combined_context']
-    brainstorm_type = state['brainstorm_type']
-    llm = state['llm']
-    
-    if brainstorm_type == 'project':
+    topic = state["topic"]
+    personas = state["personas"]
+    combined_context = state["combined_context"]
+    brainstorm_type = state["brainstorm_type"]
+    llm = state["llm"]
+
+    if brainstorm_type == "project":
         parser = JsonOutputParser(pydantic_object=ProjectIdeasList)
-        ideas_key = 'project_ideas'
+        ideas_key = "project_ideas"
     else:
         parser = JsonOutputParser(pydantic_object=ResearchIdeasList)
-        ideas_key = 'research_ideas'
-        
+        ideas_key = "research_ideas"
+
     template = ideation_prompts[brainstorm_type]
     prompt_template = PromptTemplate(
         template=template,
-        input_variables=["role", "backstory", "goal", "topic", "combined_context"],
+        input_variables=["Role", "backstory", "goal", "topic", "combined_context"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
     chain = prompt_template | llm | parser
 
     async def generate_for_persona(persona: Dict) -> Optional[List[Dict]]:
         try:
-            persona_input = {"role": persona['Role'], "backstory": persona['Backstory'], "goal": persona['Goal']}
-            result = await chain.ainvoke({**persona_input, "topic": topic, "combined_context": combined_context})
-            
+            persona_input = {
+                "role": persona["Role"],
+                "backstory": persona["Backstory"],
+                "goal": persona["Goal"],
+            }
+            result = await chain.ainvoke(
+                {**persona_input, "topic": topic, "combined_context": combined_context}
+            )
+
             ideas_with_context = []
             for idea_obj in result.get(ideas_key, []):
                 idea_with_context = idea_obj
-                idea_with_context['role'] = persona['Role']
+                idea_with_context["Role"] = persona["Role"]
                 ideas_with_context.append(idea_with_context)
 
             print(f"✅ Ideas successfully generated and parsed for {persona['Role']}.")
@@ -210,10 +248,15 @@ async def divergent_ideation_node(state: GraphState) -> Dict[str, Any]:
             print(f"❌ Error generating ideas for {persona['Role']}: {e}")
             return None
 
-    results_from_personas = await asyncio.gather(*(generate_for_persona(p) for p in personas))
-    all_generated_ideas = [idea for sublist in results_from_personas if sublist for idea in sublist]
+    results_from_personas = await asyncio.gather(
+        *(generate_for_persona(p) for p in personas)
+    )
+    all_generated_ideas = [
+        idea for sublist in results_from_personas if sublist for idea in sublist
+    ]
     print(f"\nTotal ideas generated across all personas: {len(all_generated_ideas)}\n")
     return {"all_generated_ideas": all_generated_ideas}
+
 
 async def user_filter_ideas_node(state: GraphState) -> Dict[str, Any]:
     """
@@ -221,21 +264,23 @@ async def user_filter_ideas_node(state: GraphState) -> Dict[str, Any]:
     The `interrupt()` call pauses graph execution until it is resumed.
     """
     print("\n--- ⏸️ User Input Required: Idea Filtering ---")
-    print("Review the generated ideas. The Analyst will only evaluate the ideas you keep.")
-    brainstorm_type = state['brainstorm_type']
-    all_ideas = state.get('all_generated_ideas')
+    print(
+        "The AI personas have discussed and shortlisted their ideas. Review them and decide which to keep for the final analysis."
+    )
+    brainstorm_type = state["brainstorm_type"]
+    all_ideas = state.get("all_generated_ideas")
     if not all_ideas:
         print("\nNo ideas were generated to be filtered. Continuing.")
         return {"filtered_ideas": []}
-    
+
     for i, idea in enumerate(all_ideas):
-        print(f"\n--- Idea [{i+1}] (from {idea.get('role', 'Unknown')}) ---")
-        if brainstorm_type == 'project':
+        print(f"\n--- Idea [{i+1}] (from Personas' Discussion) ---")
+        if brainstorm_type == "project":
             print(f"  Idea: {idea.get('idea', 'N/A')}")
             print(f"  Target Audience: {idea.get('target_audience', 'N/A')}")
             print(f"  Problem Solved: {idea.get('problem_solved', 'N/A')}")
             print(f"  Rationale: {idea.get('rationale', 'N/A')}")
-        else: # research_paper
+        else:  # research_paper
             print(f"  Research Question: {idea.get('research_question', 'N/A')}")
             print(f"  Methodology: {idea.get('potential_methodology', 'N/A')}")
             print(f"  Contribution: {idea.get('potential_contribution', 'N/A')}")
@@ -246,16 +291,22 @@ async def user_filter_ideas_node(state: GraphState) -> Dict[str, Any]:
             "message": "\nEnter the numbers of ideas to REMOVE, separated by commas (e.g., 2, 5), or press Enter to keep all: "
         }
     )
-    
+
     if not indices_to_remove_str or not indices_to_remove_str.strip():
         print(f"\n✅ Keeping all {len(all_ideas)} ideas. Resuming workflow...")
         return {"filtered_ideas": all_ideas}
 
     try:
         # Validate the input
-        indices_to_remove = {int(num.strip()) - 1 for num in indices_to_remove_str.split(',')}
-        filtered_ideas = [idea for i, idea in enumerate(all_ideas) if i not in indices_to_remove]
-        print(f"\n✅ Removed {len(all_ideas) - len(filtered_ideas)} ideas. {len(filtered_ideas)} ideas remaining. Resuming workflow...")
+        indices_to_remove = {
+            int(num.strip()) - 1 for num in indices_to_remove_str.split(",")
+        }
+        filtered_ideas = [
+            idea for i, idea in enumerate(all_ideas) if i not in indices_to_remove
+        ]
+        print(
+            f"\n✅ Removed {len(all_ideas) - len(filtered_ideas)} ideas. {len(filtered_ideas)} ideas remaining. Resuming workflow..."
+        )
         return {"filtered_ideas": filtered_ideas}
     except ValueError:
         # A more complex graph could have a separate validation node and a conditional edge
@@ -264,40 +315,136 @@ async def user_filter_ideas_node(state: GraphState) -> Dict[str, Any]:
         return {"filtered_ideas": all_ideas}
 
 
+async def collaborative_discussion_node(state: GraphState) -> Dict[str, Any]:
+    """
+    Simulates a discussion where each persona evaluates all ideas and selects the most promising ones.
+    """
+    print("\n--- 🤝 Collaborative Discussion Node ---")
+    topic = state["topic"]
+    personas = state["personas"]
+    all_generated_ideas = state["all_generated_ideas"]
+    brainstorm_type = state["brainstorm_type"]
+    llm = state["llm"]
+
+    if not all_generated_ideas:
+        print("⚠️ No ideas to discuss. Skipping.")
+        return {"all_generated_ideas": []}
+
+    # Determine the correct parser and keys based on brainstorm type
+    if brainstorm_type == "project":
+        parser = JsonOutputParser(pydantic_object=ProjectIdeasList)
+        ideas_key = "project_ideas"
+        idea_title_key = "idea"
+    else:  # research_paper
+        parser = JsonOutputParser(pydantic_object=ResearchIdeasList)
+        ideas_key = "research_ideas"
+        idea_title_key = "research_question"
+
+    # Create a formatted string of all ideas for the prompt
+    all_ideas_text = ""
+    for idea in all_generated_ideas:
+        all_ideas_text += (
+            f"### Idea from {idea['Role']}: {idea.get(idea_title_key, 'Untitled')}\n"
+        )
+        for key, value in idea.items():
+            if key != "Role":
+                all_ideas_text += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+        all_ideas_text += "\n---\n"
+
+    # Get the appropriate prompt template
+    template = collaborative_discussion_prompts[brainstorm_type]
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["Role", "backstory", "goal", "topic", "all_ideas"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
+    chain = prompt | llm | parser
+
+    async def get_persona_selections(persona: Dict) -> List[Dict]:
+        """Sub-task to get selections for a single persona."""
+        print(f"-> Asking {persona['Role']} for their top picks...")
+        try:
+            persona_input = {
+                "role": persona["Role"],
+                "backstory": persona["Backstory"],
+                "goal": persona["Goal"],
+            }
+            response = await chain.ainvoke(
+                {
+                    **persona_input,
+                    "topic": topic,
+                    "all_ideas": all_ideas_text,
+                }
+            )
+            selected_ideas = response.get(ideas_key, [])
+            print(f"✅ {persona['Role']} selected {len(selected_ideas)} ideas.")
+            return selected_ideas
+        except Exception as e:
+            print(f"❌ Error getting selections from {persona['Role']}: {e}")
+            return []
+
+    # Gather selections from all personas
+    all_selections_nested = await asyncio.gather(
+        *(get_persona_selections(p) for p in personas)
+    )
+
+    # Flatten the list and remove duplicates based on the idea title
+    collaborative_ideas = []
+    seen_titles = set()
+    for sublist in all_selections_nested:
+        if not sublist:
+            continue
+        for idea in sublist:
+            title = idea.get(idea_title_key)
+            if title and title not in seen_titles:
+                seen_titles.add(title)
+                collaborative_ideas.append(idea)
+
+    print(f"\nTotal unique ideas after discussion: {len(collaborative_ideas)}")
+    return {"all_generated_ideas": collaborative_ideas}
+
+
 async def user_select_idea_node(state: GraphState) -> Dict[str, Any]:
     """
     A node that interrupts the graph to ask the user to select the final idea.
     """
     print("\n--- ⏸️ User Input Required: Final Selection ---")
-    print("The Analyst has provided the top ideas. Please select one to create a final document.")
-    top_ideas = state.get('top_ideas')
+    print(
+        "The Analyst has provided the top ideas. Please select one to create a final document."
+    )
+    top_ideas = state.get("top_ideas")
     if not top_ideas:
         print("⚠️ No top ideas were provided by the analyst. Skipping.")
         return {"chosen_idea": None}
-    
+
     for i, idea in enumerate(top_ideas):
         print(f"\n  [{i+1}] Title: {idea['title']}")
         print(f"      Description: {idea['description']}")
 
     choice_str = interrupt(
-        {
-            "message": f"\nChoose an idea to proceed with (1-{len(top_ideas)}): "
-        }
+        {"message": f"\nChoose an idea to proceed with (1-{len(top_ideas)}): "}
     )
 
     try:
         choice = int(choice_str)
         if 1 <= choice <= len(top_ideas):
             chosen = top_ideas[choice - 1]
-            print(f"✅ Great choice! Selecting '{chosen['title']}'. Generating the final document...")
+            print(
+                f"✅ Great choice! Selecting '{chosen['title']}'. Generating the final document..."
+            )
             return {"chosen_idea": chosen}
         else:
-            print(f"⚠️ Invalid choice. Number out of range. Select the first idea by default.")
+            print(
+                f"⚠️ Invalid choice. Number out of range. Select the first idea by default."
+            )
             return {"chosen_idea": top_ideas[0]}
     except (ValueError, IndexError, TypeError):
         # Handles cases where input is not a number, or empty.
-        print("⚠️ Invalid input. Could not parse number. Selecting the first idea by default.")
-        return {"chosen_idea": top_ideas[0]}    
+        print(
+            "⚠️ Invalid input. Could not parse number. Selecting the first idea by default."
+        )
+        return {"chosen_idea": top_ideas[0]}
+
 
 async def ask_for_arxiv_search_node(state: GraphState) -> Dict[str, Any]:
     """Interrupts to ask the user if they want to perform an ArXiv search."""
@@ -314,44 +461,54 @@ async def ask_for_arxiv_search_node(state: GraphState) -> Dict[str, Any]:
 
 async def arxiv_search_node(state: GraphState) -> Dict[str, Any]:
     """Search relevant paper on ArXiv"""
-    idea = state['chosen_idea']
+    idea = state["chosen_idea"]
     arxiv_context = "No relevant papers found on ArXiv for this topic."
-    
+
     if not idea:
         return {"arxiv_context": arxiv_context}
 
-    search_query = idea['title']
+    search_query = idea["title"]
 
     print("\n--- 📚 Searching ArXiv for relevant papers... ---")
-    
+
     try:
-        arxiv_loader = ArxivLoader(query=search_query, load_max_docs=8, load_all_available_meta=True)
+        arxiv_loader = ArxivLoader(
+            query=search_query, load_max_docs=8, load_all_available_meta=True
+        )
         paper_documents = arxiv_loader.get_summaries_as_docs()
-        
+
         if paper_documents:
             summaries = []
             today = datetime.datetime.now().date()
             for doc in paper_documents:
                 published_date = doc.metadata.get("Published")
                 if published_date and (today - published_date).days <= 2 * 365:
-                    summaries.append(f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace("\n", " ") or 'N/A'}")
+                    summaries.append(
+                        f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace("\n", " ") or 'N/A'}"
+                    )
                 else:
-                    print(f"Skipping paper '{doc.metadata.get('Title', 'N/A')}' published on {published_date} (older than 2 years)")
-            
+                    print(
+                        f"Skipping paper '{doc.metadata.get('Title', 'N/A')}' published on {published_date} (older than 2 years)"
+                    )
+
             if summaries:
-                arxiv_context = "**Relevant Research from ArXiv:**\n\n" + "\n\n---\n\n".join(summaries)
+                arxiv_context = (
+                    "**Relevant Research from ArXiv:**\n\n"
+                    + "\n\n---\n\n".join(summaries)
+                )
                 print(arxiv_context)
     except Exception as e:
         print(f"❌ Error during ArXiv search: {e}")
 
     return {"arxiv_context": arxiv_context}
 
+
 async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
     """Runs a 'Red Team' agent to critique a list of ideas."""
     print("\n--- 🛡️ Red Team Critique Node ---")
-    ideas_to_critique = state['filtered_ideas']
-    brainstorm_type = state['brainstorm_type']
-    llm = state['llm']
+    ideas_to_critique = state["filtered_ideas"]
+    brainstorm_type = state["brainstorm_type"]
+    llm = state["llm"]
 
     if not ideas_to_critique:
         print("⚠️ No ideas to critique. Skipping.")
@@ -359,10 +516,10 @@ async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
 
     critique_input_str = ""
     for i, idea in enumerate(ideas_to_critique):
-        title = idea.get('idea') or idea.get('research_question', f"Idea {i+1}")
+        title = idea.get("idea") or idea.get("research_question", f"Idea {i+1}")
         critique_input_str += f"Idea Title: {title}\n"
         for key, value in idea.items():
-            if key not in ['role']:
+            if key not in ["Role"]:
                 critique_input_str += f"- {key.replace('_', ' ').title()}: {value}\n"
         critique_input_str += "---\n"
 
@@ -377,7 +534,7 @@ async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
 
     try:
         response = await chain.ainvoke({"ideas_to_critique": critique_input_str})
-        critiques = response.get('critiques', [])
+        critiques = response.get("critiques", [])
         for crit in critiques:
             print(f"\nCritique for '{crit['idea_title']}':")
             print(f"  - {crit['critique']}")
@@ -390,10 +547,10 @@ async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
 async def convergent_evaluation_node(state: GraphState) -> Dict[str, Any]:
     """Analyzes, critiques, and selects the top ideas."""
     print("\n--- 📊 Convergent Evaluation Node ---")
-    ideas_to_evaluate = state['filtered_ideas']
-    critiques = state.get('critiques', [])
-    brainstorm_type = state['brainstorm_type']
-    llm = state['llm']
+    ideas_to_evaluate = state["filtered_ideas"]
+    critiques = state.get("critiques", [])
+    brainstorm_type = state["brainstorm_type"]
+    llm = state["llm"]
 
     if not ideas_to_evaluate:
         print("⚠️ No ideas to evaluate. Skipping.")
@@ -401,21 +558,23 @@ async def convergent_evaluation_node(state: GraphState) -> Dict[str, Any]:
 
     raw_ideas_string = ""
     for idea in ideas_to_evaluate:
-        title = idea.get('idea') or idea.get('research_question', 'Untitled')
-        raw_ideas_string += f"### Idea from {idea['role']}: {title}\n"
+        title = idea.get("idea") or idea.get("research_question", "Untitled")
+        raw_ideas_string += f"### {title}\n"
         for key, value in idea.items():
-             raw_ideas_string += f"- **{key.replace('_', ' ').title()}:** {value}\n"
-        
-        matching_critique = next((c['critique'] for c in critiques if c['idea_title'] == title), None)
+            raw_ideas_string += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+
+        matching_critique = next(
+            (c["critique"] for c in critiques if c["idea_title"] == title), None
+        )
         if matching_critique:
             raw_ideas_string += f"- **Red Team Critique:** {matching_critique}\n"
         raw_ideas_string += "\n---\n"
-    
+
     parser = StrOutputParser()
     template = evaluation_prompts[brainstorm_type]
     prompt = PromptTemplate.from_template(template)
     chain = prompt | llm | parser
-    
+
     try:
         full_response = await chain.ainvoke({"raw_ideas": raw_ideas_string})
         analysis_markdown = full_response
@@ -427,19 +586,23 @@ async def convergent_evaluation_node(state: GraphState) -> Dict[str, Any]:
             try:
                 parsed_json = json.loads(json_string)
                 top_ideas_obj = TopIdeasList(ideas=parsed_json)
-                top_ideas_list = top_ideas_obj.model_dump()['ideas']
-                analysis_markdown = full_response.replace(json_match.group(0), "").strip()
+                top_ideas_list = top_ideas_obj.model_dump()["ideas"]
+                analysis_markdown = full_response.replace(
+                    json_match.group(0), ""
+                ).strip()
             except (json.JSONDecodeError, TypeError) as e:
                 print(f"❌ Error decoding or validating JSON from evaluation: {e}")
 
         print("\n--- Full Analysis ---")
         print(analysis_markdown)
-        
+
         if top_ideas_list:
             print("\n--- Top Ideas ---")
             for idea in top_ideas_list:
-                print(f"- Title: {idea['title']}\n  Description: {idea['description']}\n")
-        
+                print(
+                    f"- Title: {idea['title']}\n  Description: {idea['description']}\n"
+                )
+
         return {"evaluation_markdown": analysis_markdown, "top_ideas": top_ideas_list}
 
     except Exception as e:
@@ -450,36 +613,46 @@ async def convergent_evaluation_node(state: GraphState) -> Dict[str, Any]:
 async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
     """Generates a final plan for the selected idea."""
     print("\n--- 📝 Implementation Planning Node ---")
-    idea = state['chosen_idea']
-    brainstorm_type = state['brainstorm_type']
-    llm = state['llm']
-    arxiv_context = state['arxiv_context']
+    idea = state["chosen_idea"]
+    brainstorm_type = state["brainstorm_type"]
+    llm = state["llm"]
+    arxiv_context = state["arxiv_context"]
 
     if not idea:
         return {"final_plan_text": "No idea chosen for planning."}
     parser = StrOutputParser()
     template = planning_prompts[brainstorm_type]
-    prompt = PromptTemplate(template=template, input_variables=["title", "description", "arxiv_context"])
+    prompt = PromptTemplate(
+        template=template, input_variables=["title", "description", "arxiv_context"]
+    )
     chain = prompt | llm | parser
 
     try:
-        plan_text = await chain.ainvoke({
-            "title": idea['title'], 
-            "description": idea['description'],
-            "arxiv_context": arxiv_context
-        })
+        plan_text = await chain.ainvoke(
+            {
+                "title": idea["title"],
+                "description": idea["description"],
+                "arxiv_context": arxiv_context,
+            }
+        )
         final_plan_text = plan_text + "\n\n---\n\n" + arxiv_context
-        
+
         markdown_plan = final_plan_text
-        mermaid_match = re.search(r"```mermaid\s*([\s\S]*?)```", final_plan_text, re.DOTALL)
+        mermaid_match = re.search(
+            r"```mermaid\s*([\s\S]*?)```", final_plan_text, re.DOTALL
+        )
         if mermaid_match:
             mermaid_chart = mermaid_match.group(1).strip()
             markdown_plan = final_plan_text.replace(mermaid_match.group(0), "").strip()
             print("\n--- Generated Mermaid Flowchart ---")
-            print("Copy the code below and paste it into a Mermaid.js renderer (e.g., https://mermaid.live)")
+            print(
+                "Copy the code below and paste it into a Mermaid.js renderer (e.g., https://mermaid.live)"
+            )
             print(f"```mermaid\n{mermaid_chart}\n```")
 
-        print(f"\n--- Generated {brainstorm_type.replace('_', ' ').title()} Outline ---")
+        print(
+            f"\n--- Generated {brainstorm_type.replace('_', ' ').title()} Outline ---"
+        )
         print(markdown_plan)
 
         return {"final_plan_text": final_plan_text}
@@ -491,14 +664,16 @@ async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
 async def user_feedback_on_plan_node(state: GraphState) -> Dict[str, Any]:
     """Interrupts to ask the user for feedback on the generated plan."""
     print("\n--- ⏸️ User Input Required: Plan Review ---")
-    print("Please review the generated plan. Do you approve it, or would you like to select a different idea?")
-    
+    print(
+        "Please review the generated plan. Do you approve it, or would you like to select a different idea?"
+    )
+
     feedback = interrupt(
         {
             "message": "Type 'Y' to finish, or 'R' to go back to the idea selection screen: "
         }
     )
-    
+
     return {"user_plan_feedback": feedback.strip().lower()}
 
 
@@ -506,7 +681,7 @@ def route_after_plan_feedback(state: GraphState) -> str:
     """Determines the next step after user feedback on the plan."""
     if state.get("user_plan_feedback") == "r":
         return "user_select_idea"
-    else: # approve or anything else
+    else:  # approve or anything else
         return "END"
 
 
@@ -516,6 +691,7 @@ def route_arxiv_search_feedback(state: GraphState) -> str:
         return "arxiv_search"
     else:
         return "implementation_planning"
+
 
 # --- Graph Builder ---
 def build_graph(checkpointer: InMemorySaver):
@@ -528,6 +704,7 @@ def build_graph(checkpointer: InMemorySaver):
     workflow.add_node("context_generation", context_generation_node)
     workflow.add_node("persona_generation", persona_generation_node)
     workflow.add_node("divergent_ideation", divergent_ideation_node)
+    workflow.add_node("collaborative_discussion", collaborative_discussion_node)
     workflow.add_node("user_filter_ideas", user_filter_ideas_node)
     workflow.add_node("red_team_critique", red_team_critique_node)
     workflow.add_node("convergent_evaluation", convergent_evaluation_node)
@@ -542,39 +719,34 @@ def build_graph(checkpointer: InMemorySaver):
     workflow.add_conditional_edges(
         "ask_for_pdf_path",
         route_pdf_input,
-        {
-            "process_pdf": "process_pdf",
-            "context_generation": "context_generation"
-        }
+        {"process_pdf": "process_pdf", "context_generation": "context_generation"},
     )
     workflow.add_edge("process_pdf", "context_generation")
     workflow.add_edge("context_generation", "persona_generation")
     workflow.add_edge("persona_generation", "divergent_ideation")
-    workflow.add_edge("divergent_ideation", "user_filter_ideas")
+    workflow.add_edge("divergent_ideation", "collaborative_discussion")
+    workflow.add_edge("collaborative_discussion", "user_filter_ideas")
     workflow.add_edge("user_filter_ideas", "red_team_critique")
     workflow.add_edge("red_team_critique", "convergent_evaluation")
     workflow.add_edge("convergent_evaluation", "user_select_idea")
     workflow.add_edge("user_select_idea", "ask_for_arxiv_search")
     workflow.add_edge("arxiv_search", "implementation_planning")
     workflow.add_edge("implementation_planning", "user_feedback_on_plan")
-    
+
     workflow.add_conditional_edges(
         "user_feedback_on_plan",
         route_after_plan_feedback,
-        {
-            "user_select_idea": "user_select_idea",
-            "END": END
-        }
+        {"user_select_idea": "user_select_idea", "END": END},
     )
     workflow.add_conditional_edges(
         "ask_for_arxiv_search",
         route_arxiv_search_feedback,
         {
             "arxiv_search": "arxiv_search",
-            "implementation_planning": "implementation_planning"
-        }
+            "implementation_planning": "implementation_planning",
+        },
     )
-    
+
     # Compile the graph
     app = workflow.compile(checkpointer=checkpointer)
     return app

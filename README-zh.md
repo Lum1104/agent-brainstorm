@@ -20,6 +20,7 @@ graph TD;
         context_generation(context_generation)
         persona_generation(persona_generation)
         divergent_ideation(divergent_ideation)
+        collaborative_discussion(collaborative_discussion)
         user_filter_ideas(user_filter_ideas)
         red_team_critique(red_team_critique)
         convergent_evaluation(convergent_evaluation)
@@ -35,9 +36,10 @@ graph TD;
         ask_for_arxiv_search -.-> implementation_planning;
         ask_for_pdf_path -.-> context_generation;
         ask_for_pdf_path -.-> process_pdf;
+        collaborative_discussion --> user_filter_ideas;
         context_generation --> persona_generation;
         convergent_evaluation --> user_select_idea;
-        divergent_ideation --> user_filter_ideas;
+        divergent_ideation --> collaborative_discussion;
         implementation_planning --> user_feedback_on_plan;
         persona_generation --> divergent_ideation;
         process_pdf --> context_generation;

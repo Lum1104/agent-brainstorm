@@ -2,24 +2,24 @@
 # This file contains the prompt templates for the brainstorming workflow.
 
 persona_prompts = {
-    'project': """You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas.
+    "project": """You are a world-class innovation consultant. The user wants to brainstorm project ideas for '{topic}'. Your task is to identify and define 4 distinct, expert personas.
 
 Use this combined context from a web search and a user-provided document:
 {combined_context}
 
 STRICTLY return your response as a single, valid JSON object in the following format. Do not include any explanatory text, markdown formatting, or anything outside of the JSON structure.
 {format_instructions}""",
-    'research_paper': """You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas.
+    "research_paper": """You are a distinguished academic advisor. The user wants to brainstorm research paper ideas for '{topic}'. Your task is to identify and define 4 distinct scholarly personas.
 
 Use this combined context from a web search and a user-provided document:
 {combined_context}
 
 STRICTLY return your response as a single, valid JSON object in the following format. Do not include any explanatory text, markdown formatting, or anything outside of the JSON structure.
-{format_instructions}"""
+{format_instructions}""",
 }
 
 ideation_prompts = {
-    'project': """You are:
+    "project": """You are:
 - Role: {role}
 - Backstory: {backstory}
 - Goal: {goal}
@@ -30,7 +30,7 @@ Your primary goal is novelty and quantity. Do NOT critique or elaborate on the i
 
 STRICTLY return your response as a single, valid JSON object in the following format. Do not include any explanatory text, markdown formatting, or anything outside of the JSON structure.
 {format_instructions}""",
-    'research_paper': """You are:
+    "research_paper": """You are:
 - Role: {role}
 - Backstory: {backstory}
 - Goal: {goal}
@@ -40,11 +40,11 @@ As a {role}, your task is to formulate 5 novel research ideas related to '{topic
 Do not critique the feasibility of the ideas yet.
 
 STRICTLY return your response as a single, valid JSON object in the following format. Do not include any explanatory text, markdown formatting, or anything outside of the JSON structure.
-{format_instructions}"""
+{format_instructions}""",
 }
 
 red_team_prompts = {
-    'project': """You are a "Red Team" agent, a skeptical critic and devil's advocate. Your task is to challenge a list of project ideas by identifying potential flaws.
+    "project": """You are a "Red Team" agent, a skeptical critic and devil's advocate. Your task is to challenge a list of project ideas by identifying potential flaws.
 For each idea provided, you must generate a concise but impactful critique.
 
 Focus on aspects like:
@@ -61,7 +61,7 @@ Here are the ideas to critique:
 
 STRICTLY return your response as a single, valid JSON object. Each critique should correspond to an original idea.
 {format_instructions}""",
-    'research_paper': """You are a "Red Team" agent, a skeptical academic rival. Your task is to challenge a list of research ideas by identifying potential flaws.
+    "research_paper": """You are a "Red Team" agent, a skeptical academic rival. Your task is to challenge a list of research ideas by identifying potential flaws.
 For each research question, you must generate a concise but impactful critique.
 
 Focus on aspects like:
@@ -77,11 +77,11 @@ Here are the research questions to critique:
 ---
 
 STRICTLY return your response as a single, valid JSON object. Each critique should correspond to an original research question.
-{format_instructions}"""
+{format_instructions}""",
 }
 
 evaluation_prompts = {
-    'project': """You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas and their critiques from a 'Red Team'. Your task is to perform a convergent analysis, taking both into account.
+    "project": """You are a Chief Analyst at a venture capital firm. You have received a list of raw, brainstormed project ideas and their critiques from a 'Red Team'. Your task is to perform a convergent analysis, taking both into account.
 
 1. **Synthesize & Cluster:** Read all the ideas and their critiques. De-duplicate them and group similar concepts into project themes.
 2. **Critique & Evaluate:** For each unique project theme, provide a critical evaluation in a markdown table with columns: 'Project Theme', 'Description', 'Novelty (1-10)', 'Feasibility (1-10)', 'Impact (1-10)', 'Justification (incorporating red team feedback)'.
@@ -91,7 +91,7 @@ Raw Ideas & Critiques:
 ---
 {raw_ideas}
 ---""",
-    'research_paper': """You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas and critiques from a 'Red Team'. Your task is to perform a convergent analysis, taking both into account.
+    "research_paper": """You are a seasoned peer reviewer for a top-tier academic journal. You have received a list of raw, brainstormed research ideas and critiques from a 'Red Team'. Your task is to perform a convergent analysis, taking both into account.
 
 1. **Synthesize & Cluster:** Read all the ideas and critiques. Group similar concepts into distinct research avenues.
 2. **Critique & Evaluate:** For each research avenue, provide a critical evaluation in a markdown table with columns: 'Research Avenue', 'Description', 'Novelty (1-10)', 'Methodology (1-10)', 'Contribution (1-10)', 'Justification (incorporating red team feedback)'.
@@ -100,11 +100,11 @@ Raw Ideas & Critiques:
 Raw Ideas & Critiques:
 ---
 {raw_ideas}
----"""
+---""",
 }
 
 planning_prompts = {
-    'project': """You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title, description, and recent academic research.
+    "project": """You are an expert AI Project Manager. A promising project idea has been selected. Your task is to generate a detailed and actionable project initiation document (PID) based on the provided title, description, and recent academic research.
 
 **Selected Idea:**
 - **Title:** {title}
@@ -141,7 +141,7 @@ Please structure your response in Markdown with the following sections, integrat
 
 Finally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"].
 """,
-    'research_paper': """You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline, informed by existing literature.
+    "research_paper": """You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline, informed by existing literature.
 
 **Selected Research Question:**
 - **Title:** {title}
@@ -176,5 +176,39 @@ Please structure your response in Markdown with the following sections, making s
 * Based on the **inferred field**, recommend 2-3 highly relevant and reputable academic conferences or journals for publication.
 
 Finally, create a Mermaid flowchart to visualize the research stages. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"].
-"""
+""",
+}
+
+
+collaborative_discussion_prompts = {
+    "project": """
+You are {role}, with the following backstory: {backstory}. Your primary goal is: {goal}.
+
+You are in a collaborative brainstorming session about "{topic}". The group has generated the following list of project ideas. Your task is to act as your persona, critically review ALL the ideas, and then select the 2-3 ideas that you believe are the most promising, innovative, and aligned with the project's overall goals.
+
+For each idea you select, you MUST provide a new, concise 'rationale' from YOUR perspective, explaining why it's a strong choice. You can agree with, build upon, or even contradict the original rationale.
+
+**All Generated Ideas:**
+{all_ideas}
+
+---
+Based on your expert review, provide your final selections. The output MUST be a JSON object that strictly follows this format. Ensure the selected ideas are copied exactly from the list above, but with your new rationale.
+
+{format_instructions}
+""",
+    "research_paper": """
+You are {role}, with the following backstory: {backstory}. Your primary goal is: {goal}.
+
+You are in a collaborative brainstorming session about "{topic}". The group has generated the following list of research ideas. Your task is to act as your persona, critically review ALL the ideas, and then select the 2-3 ideas that you believe are the most promising, innovative, and aligned with the overall research goals.
+
+For each idea you select, you MUST provide a new, concise 'rationale' from YOUR perspective, explaining why it's a strong choice. You can agree with, build upon, or even contradict the original rationale.
+
+**All Generated Ideas:**
+{all_ideas}
+
+---
+Based on your expert review, provide your final selections. The output MUST be a JSON object that strictly follows this format. Ensure the selected ideas are copied exactly from the list above, but with your new rationale.
+
+{format_instructions}
+""",
 }

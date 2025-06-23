@@ -15,19 +15,21 @@ from brainstorm_tool.utils.ui import (
 )
 from brainstorm_tool.utils.file_utils import (
     generate_markdown_export,
-    save_markdown_file
+    save_markdown_file,
 )
+
 
 async def main_async():
     """Main async function that runs the graph-based workflow."""
     print("🚀 Welcome to the AI Brainstorming Agent (LangGraph Edition)!")
-    
+
     # 1. --- Initial Setup ---
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         try:
             from google.colab import userdata
-            api_key = userdata.get('GOOGLE_API_KEY')
+
+            api_key = userdata.get("GOOGLE_API_KEY")
         except (ImportError, KeyError):
             api_key = prompt_user_input("Please enter your Google API Key: ")
 
@@ -35,14 +37,15 @@ async def main_async():
         print("A Google API Key is required. Exiting.")
         return
 
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", google_api_key=api_key, temperature=0.7)
-    
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.0-flash", google_api_key=api_key, temperature=0.7
+    )
+
     brainstorm_type = select_brainstorm_type()
     topic = prompt_user_input("Enter a topic to brainstorm: ")
     if not topic:
         print("A topic is required. Exiting.")
         return
-
 
     # 2. --- Build and Compile the Graph ---
     checkpointer = InMemorySaver()
@@ -67,35 +70,43 @@ async def main_async():
         "final_plan_text": "",
         "arxiv_context": "No relevant papers found on ArXiv for this topic.",
         "use_arxiv_search": True,
-        "user_plan_feedback": ""
+        "user_plan_feedback": "",
     }
-    
-    config = {"configurable": {"thread_id": "brainstorm-thread-v2"}} # Using a new thread ID
+
+    config = {
+        "configurable": {"thread_id": "brainstorm-thread-v2"}
+    }  # Using a new thread ID
     try:
         result = await app.ainvoke(input=initial_state, config=config)
         while "__interrupt__" in result:
-            user_instruction = result['__interrupt__'][0].value['message']
+            user_instruction = result["__interrupt__"][0].value["message"]
             value = input(user_instruction)
             result = await app.ainvoke(Command(resume=value), config=config)
     except Exception as e:
         print(f"\nAn error occurred during graph execution: {e}")
 
-
     # 4. --- Save Results ---
     if "final_plan_text" in result:
         print("\n✅ Graph execution complete.")
-        if result.get('final_plan_text'):
+        if result.get("final_plan_text"):
             print("\n--- Session Complete ---")
-            save_choice = prompt_user_input("Would you like to save the full session to a Markdown file? (Y/n): ").lower()
-            if save_choice in ['y', 'yes', '']:
+            save_choice = prompt_user_input(
+                "Would you like to save the full session to a Markdown file? (Y/n): "
+            ).lower()
+            if save_choice in ["y", "yes", ""]:
                 markdown_content = generate_markdown_export(result)
-                default_filename = f"brainstorm_{result['topic'].replace(' ', '_').lower()}.md"
-                filename = prompt_user_input(f"Enter filename (default: {default_filename}): ") or default_filename
+                default_filename = (
+                    f"brainstorm_{result['topic'].replace(' ', '_').lower()}.md"
+                )
+                filename = (
+                    prompt_user_input(f"Enter filename (default: {default_filename}): ")
+                    or default_filename
+                )
                 save_markdown_file(filename, markdown_content)
             else:
                 print("Session not saved.")
         else:
-                print("\nWorkflow completed, but no final plan was generated to save.")
+            print("\nWorkflow completed, but no final plan was generated to save.")
     else:
         print("\nWorkflow did not complete successfully or was exited early.")
 
@@ -108,8 +119,9 @@ def main():
         print("\nProcess interrupted by user. Exiting.")
     finally:
         # Ensure cursor is visible on exit
-        sys.stdout.write('\033[?25h')
+        sys.stdout.write("\033[?25h")
         sys.stdout.flush()
+
 
 if __name__ == "__main__":
     main()
