@@ -27,12 +27,7 @@ async def main_async():
     # 1. --- Initial Setup ---
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        try:
-            from google.colab import userdata
-
-            api_key = userdata.get("GOOGLE_API_KEY")
-        except (ImportError, KeyError):
-            api_key = prompt_user_input("Please enter your Google API Key: ")
+        api_key = prompt_user_input("Please enter your Google API Key: ")
 
     if not api_key:
         print("A Google API Key is required. Exiting.")
