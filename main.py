@@ -8,12 +8,13 @@ import sys
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
-from brainstorm_tool.agents.workflow import build_graph, GraphState
-from brainstorm_tool.utils.ui import (
+from brainstorm.agents.workflow import build_graph
+from brainstorm.agents.state import GraphState
+from brainstorm.utils.ui import (
     prompt_user_input,
     select_brainstorm_type,
 )
-from brainstorm_tool.utils.file_utils import (
+from brainstorm.utils.file_utils import (
     generate_markdown_export,
     save_markdown_file,
 )
@@ -21,7 +22,7 @@ from brainstorm_tool.utils.file_utils import (
 
 async def main_async():
     """Main async function that runs the graph-based workflow."""
-    print("🚀 Welcome to the AI Brainstorming Agent (LangGraph Edition)!")
+    print("🚀 Welcome to the AI Brainstorming Agent!")
 
     # 1. --- Initial Setup ---
     api_key = os.environ.get("GOOGLE_API_KEY")

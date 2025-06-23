@@ -1,7 +1,8 @@
 # file_utils.py
 # This file contains utility functions for file I/O and data handling.
 
-from typing import Optional, Dict, Any
+from typing import Optional
+from brainstorm.agents.state import GraphState
 
 # Try to import pypdf, but handle the case where it's not installed.
 try:
@@ -33,7 +34,7 @@ def get_pdf_text(pdf_path: str) -> Optional[str]:
         return None
 
 
-def generate_markdown_export(state: Dict[str, Any]) -> str:
+def generate_markdown_export(state: GraphState) -> str:
     """
     Generates a complete markdown string of the entire brainstorming session
     from the final graph state.

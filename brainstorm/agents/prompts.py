@@ -182,9 +182,9 @@ Finally, create a Mermaid flowchart to visualize the research stages. Enclose it
 
 collaborative_discussion_prompts = {
     "project": """
-You are {role}, with the following backstory: {backstory}. Your primary goal is: {goal}.
+You are {role}, with the following backstory: {backstory}.
 
-You are in a collaborative brainstorming session about "{topic}". The group has generated the following list of project ideas. Your task is to act as your persona, critically review ALL the ideas, and then select the 2-3 ideas that you believe are the most promising, innovative, and aligned with the project's overall goals.
+You are in a collaborative brainstorming session about "{topic}". The group has generated the following list of project ideas. Review ALL the ideas, and then select the 6-7 ideas that you believe are the most promising, innovative.
 
 For each idea you select, you MUST provide a new, concise 'rationale' from YOUR perspective, explaining why it's a strong choice. You can agree with, build upon, or even contradict the original rationale.
 
@@ -197,9 +197,9 @@ Based on your expert review, provide your final selections. The output MUST be a
 {format_instructions}
 """,
     "research_paper": """
-You are {role}, with the following backstory: {backstory}. Your primary goal is: {goal}.
+You are {role}, with the following backstory: {backstory}.
 
-You are in a collaborative brainstorming session about "{topic}". The group has generated the following list of research ideas. Your task is to act as your persona, critically review ALL the ideas, and then select the 2-3 ideas that you believe are the most promising, innovative, and aligned with the overall research goals.
+You are in a collaborative brainstorming session about "{topic}". The group has generated the following list of research ideas. Review ALL the ideas, and then select the 6-7 ideas that you believe are the most promising, innovative.
 
 For each idea you select, you MUST provide a new, concise 'rationale' from YOUR perspective, explaining why it's a strong choice. You can agree with, build upon, or even contradict the original rationale.
 
