@@ -113,11 +113,15 @@ planning_prompts = {
 **Context from Academic Research (ArXiv):**
 {arxiv_context}
 
+**Context from User provided PDF/Internet:**
+{combined_context}
+
 ---
 
 Please structure your response in Markdown with the following sections, integrating insights from the ArXiv context where relevant:
 
 ### 1. Project Overview & Business Case
+* **Title:** {title}
 * **Inferred Business Domain:** Based on the title and description, first identify the specific business domain or industry this project belongs to (e.g., FinTech - Algorithmic Trading, Healthcare - Diagnostic AI, E-commerce - Recommendation Systems).
 * **Problem Statement & Opportunity:** Briefly introduce the business problem the project solves or the market opportunity it captures.
 * **Project Goals & Objectives:** Clearly articulate the primary business goal and list 2-3 specific, measurable (SMART) objectives for the project.
@@ -139,7 +143,7 @@ Please structure your response in Markdown with the following sections, integrat
 ### 4. Phased Project Roadmap
 * Provide a high-level project timeline, broken down into distinct phases with estimated durations in weeks.
 
-Finally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"].
+Finally, create a detailed Mermaid flowchart to visualize the project roadmap. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"], (DO NOT USE COMMENTS). The flowchart should break down the project phases into more granular tasks and milestones. For example:\n```mermaid\ngraph TD;\n    subgraph "Phase 1: Discovery & Planning (3 Weeks)"\n        A["Kick-off & Stakeholder Alignment"] --> B["Market Research & Competitive Analysis"];\n        B --> C["Finalize Requirements & Define KPIs"];\n        C --> D["Develop Detailed Project Roadmap & Resource Plan"];\n    end\n    \n    subgraph "Phase 2: Design & Prototyping (4 Weeks)"\n        E["Architectural Design & Tech Stack Finalization"] --> F["Data Sourcing & Preparation"];\n        F --> G["Wireframing & UI/UX Design"];\n        G --> H["Build Interactive Prototype & Conduct User Feedback Session"];\n    end\n    \n    subgraph "Phase 3: Development & QA (8 Weeks)"\n        I["Sprint 1-3: Core Feature Development (Backend & AI Model)"] --> J["Sprint 4-5: Frontend Development & API Integration"];\n        J --> K["Continuous Integration & Unit/Integration Testing"];\n        K --> L["User Acceptance Testing (UAT) & Bug Fixing"];\n    end\n    \n    subgraph "Phase 4: Deployment & Launch (2 Weeks)"\n        M["Prepare Production Environment"] --> N["Deploy Application & Monitor Stability"];\n        N --> O["Official Launch & Internal Handoff to Operations Team"];\n    end\n\n    D --> E;\n    H --> I;\n    L --> M;\n    O --> P["Phase 5: Post-Launch Monitoring & Iteration"];\n```
 """,
     "research_paper": """You are an experienced academic writer. A promising research idea has been selected. Your task is to generate a concise and actionable research outline, informed by existing literature.
 
@@ -150,11 +154,15 @@ Finally, create a detailed Mermaid flowchart to visualize the project roadmap. E
 **Context from Recent Literature (ArXiv):**
 {arxiv_context}
 
+**Context from User provided PDF/Internet:**
+{combined_context}
+
 ---
 
 Please structure your response in Markdown with the following sections, making sure to position your proposed research in relation to the existing work from ArXiv:
 
 ### 1. Inferred Research Field & Problem Statement
+* **Title:** {title}
 * **Inferred Field:** Based on the title and description, first identify and state the specific academic field and sub-field this research belongs to (e.g., Computer Science - Natural Language Processing, Sociology - Urban Studies, Bioinformatics, etc.).
 * **Problem Context:** Briefly introduce the broader context of the problem.
 * **Core Challenge & Objectives:** Clearly articulate the central challenge the research addresses and list 2-3 specific, actionable objectives.
@@ -175,7 +183,7 @@ Please structure your response in Markdown with the following sections, making s
 ### 4. Potential Target Publication Venues
 * Based on the **inferred field**, recommend 2-3 highly relevant and reputable academic conferences or journals for publication.
 
-Finally, create a Mermaid flowchart to visualize the research stages. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"].
+Finally, create a Mermaid flowchart to visualize the research stages. Enclose it in a ```mermaid code block. IMPORTANT: Use double quotes for the text inside nodes, like A["Your Text Here"], (DO NOT USE COMMENTS). The flowchart should reflect the detailed methodology, showing how different stages connect and how analysis can be multi-faceted. Here is a comprehensive example:\n```mermaid\ngraph TD;\n    subgraph "Phase 1: Problem Definition & Literature Review"\n        A["Define Research Questions & Hypotheses"] --> B["Conduct Literature Review"];\n    end\n\n    subgraph "Phase 2: Data & Methodology"\n       C["Select Research Design (e.g., Algorithm Development)"] --> D["Data Acquisition & Preprocessing"];\n    end\n\n    subgraph "Phase 3: Model Development & Experimentation"\n        E["Develop Baseline & Proposed Models"] --> F["Experiment Execution: Run all models on the prepared dataset"];\n    end\n    \n    subgraph "Phase 4: Multi-Faceted Analysis & Evaluation"\n        F --> G["Performance Analysis: Compare model accuracy, F1-scores, etc."];\n        F --> H["Robustness Analysis: Test against noisy data or adversarial inputs"];\n        F --> I["Computational Cost Analysis: Measure inference time and memory usage"];\n        G --> J["Results Consolidation & Statistical Significance Testing"];\n        H --> J;\n        I --> J;\n    end\n\n    subgraph "Phase 5: Synthesis & Dissemination"\n        K["Synthesize All Findings & Draw Conclusions"] --> L["Write Manuscript"];\n        L --> M["Submit to Target Journal/Conference"];\n    end\n\n    B --> C;\n    D --> E;\n    J --> K;\n```
 """,
 }
 

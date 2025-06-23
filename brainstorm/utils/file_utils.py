@@ -1,6 +1,7 @@
 # file_utils.py
 # This file contains utility functions for file I/O and data handling.
 
+import re
 from typing import Optional
 from brainstorm.agents.state import GraphState
 
@@ -108,6 +109,9 @@ def generate_markdown_export(state: GraphState) -> str:
 def save_markdown_file(filename: str, content: str):
     """Saves the given content to a file."""
     try:
+        content = re.sub(
+            r"```markdown\s*([\s\S]*?)```", r"\1", content, flags=re.DOTALL
+        )
         with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
         print(f"\n✅ Session successfully saved to '{filename}'")

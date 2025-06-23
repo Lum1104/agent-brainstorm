@@ -34,6 +34,7 @@ async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
                 "title": idea["title"],
                 "description": idea["description"],
                 "arxiv_context": arxiv_context,
+                "combined_context": state.get("combined_context", ""),
             }
         )
         final_plan_text = plan_text + "\n\n---\n\n" + arxiv_context
