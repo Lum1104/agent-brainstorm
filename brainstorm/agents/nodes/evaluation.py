@@ -4,6 +4,7 @@ import json
 import re
 import asyncio
 from typing import Dict, Any, List
+from brainstorm.utils.ui import console
 from collections import defaultdict
 
 from langchain.prompts import PromptTemplate
@@ -28,7 +29,7 @@ async def collaborative_discussion_node(state: GraphState) -> Dict[str, Any]:
     Simulates a discussion where each persona evaluates all ideas.
     Ideas selected by two or more personas are kept, along with the rationales from each agent who selected them.
     """
-    print("\n--- 🤝 Collaborative Discussion Node ---")
+    console.print("\n--- 🤝 Collaborative Discussion Node ---", style="bold cyan")
     topic = state["topic"]
     personas = state["personas"]
     all_generated_ideas = state["all_generated_ideas"]
@@ -36,7 +37,7 @@ async def collaborative_discussion_node(state: GraphState) -> Dict[str, Any]:
     llm = state.get("llm")
 
     if not all_generated_ideas:
-        print("⚠️ No ideas to discuss. Skipping.")
+        console.print("⚠️ No ideas to discuss. Skipping.", style="yellow")
         return {"all_generated_ideas": []}
 
     # Determine the correct parser and keys based on the brainstorm type
@@ -71,7 +72,7 @@ async def collaborative_discussion_node(state: GraphState) -> Dict[str, Any]:
 
     async def get_persona_selections(persona: Dict) -> List[Dict]:
         """Sub-task to get selections for a single persona."""
-        print(f"-> Asking {persona['Role']} for their top picks...")
+        console.print(f"-> Asking {persona['Role']} for their top picks...")
         try:
             persona_input = {
                 "role": persona["Role"],
@@ -85,10 +86,16 @@ async def collaborative_discussion_node(state: GraphState) -> Dict[str, Any]:
                 }
             )
             selected_ideas = response.get(ideas_key, [])
-            print(f"✅ {persona['Role']} selected {len(selected_ideas)} ideas.")
+            console.print(
+                f"✅ {persona['Role']} selected {len(selected_ideas)} ideas.",
+                style="green",
+            )
             return selected_ideas
         except Exception as e:
-            print(f"❌ Error getting selections from {persona['Role']}: {e}")
+            console.print(
+                f"❌ Error getting selections from {persona['Role']}: {e}",
+                style="red",
+            )
             return []
 
     # Gather selections from all personas
@@ -141,19 +148,22 @@ async def collaborative_discussion_node(state: GraphState) -> Dict[str, Any]:
                 final_idea["rationale"] = "\n".join(data["rationales"])
                 collaborative_ideas.append(final_idea)
 
-    print(f"\nTotal ideas with consensus (>= 2 selections): {len(collaborative_ideas)}")
+    console.print(
+        f"\nTotal ideas with consensus (>= 2 selections): {len(collaborative_ideas)}",
+        style="bold",
+    )
     return {"all_generated_ideas": collaborative_ideas}
 
 
 async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
     """Runs a 'Red Team' agent to critique a list of ideas."""
-    print("\n--- 🛡️ Red Team Critique Node ---")
+    console.print("\n--- 🛡️ Red Team Critique Node ---", style="bold cyan")
     ideas_to_critique = state["filtered_ideas"]
     brainstorm_type = state["brainstorm_type"]
     llm = state["llm"]
 
     if not ideas_to_critique:
-        print("⚠️ No ideas to critique. Skipping.")
+        console.print("⚠️ No ideas to critique. Skipping.", style="yellow")
         return {"critiques": []}
 
     critique_input_str = ""
@@ -178,24 +188,24 @@ async def red_team_critique_node(state: GraphState) -> Dict[str, Any]:
         response = await chain.ainvoke({"ideas_to_critique": critique_input_str})
         critiques = response.get("critiques", [])
         for crit in critiques:
-            print(f"\nCritique for '{crit['idea_title']}':")
-            print(f"  - {crit['critique']}")
+            console.print(f"\nCritique for '{crit['idea_title']}':", style="bold")
+            console.print(f"  - {crit['critique']}")
         return {"critiques": critiques}
     except Exception as e:
-        print(f"❌ Error during Red Team critique: {e}")
+        console.print(f"❌ Error during Red Team critique: {e}", style="red")
         return {"critiques": []}
 
 
 async def convergent_evaluation_node(state: GraphState) -> Dict[str, Any]:
     """Analyzes, critiques, and selects the top ideas."""
-    print("\n--- 📊 Convergent Evaluation Node ---")
+    console.print("\n--- 📊 Convergent Evaluation Node ---", style="bold cyan")
     ideas_to_evaluate = state["filtered_ideas"]
     critiques = state.get("critiques", [])
     brainstorm_type = state["brainstorm_type"]
     llm = state["llm"]
 
     if not ideas_to_evaluate:
-        print("⚠️ No ideas to evaluate. Skipping.")
+        console.print("⚠️ No ideas to evaluate. Skipping.", style="yellow")
         return {"top_ideas": [], "evaluation_markdown": ""}
 
     raw_ideas_string = ""
@@ -233,20 +243,23 @@ async def convergent_evaluation_node(state: GraphState) -> Dict[str, Any]:
                     json_match.group(0), ""
                 ).strip()
             except (json.JSONDecodeError, TypeError) as e:
-                print(f"❌ Error decoding or validating JSON from evaluation: {e}")
+                console.print(
+                    f"❌ Error decoding or validating JSON from evaluation: {e}",
+                    style="red",
+                )
 
-        print("\n--- Full Analysis ---")
-        print(analysis_markdown)
+        console.print("\n--- Full Analysis ---", style="bold magenta")
+        console.print(analysis_markdown)
 
         if top_ideas_list:
-            print("\n--- Top Ideas ---")
+            console.print("\n--- Top Ideas ---", style="bold green")
             for idea in top_ideas_list:
-                print(
+                console.print(
                     f"- Title: {idea['title']}\n  Description: {idea['description']}\n"
                 )
 
         return {"evaluation_markdown": analysis_markdown, "top_ideas": top_ideas_list}
 
     except Exception as e:
-        print(f"❌ Error during convergent evaluation: {e}")
+        console.print(f"❌ Error during convergent evaluation: {e}", style="red")
         return {"top_ideas": [], "evaluation_markdown": ""}
