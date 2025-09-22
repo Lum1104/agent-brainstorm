@@ -2,6 +2,7 @@
 
 import re
 from typing import Dict, Any
+from brainstorm.utils.ui import console
 
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -12,7 +13,7 @@ from ..state import GraphState
 
 async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
     """Generates a final plan for the selected idea."""
-    print("\n--- 📝 Implementation Planning Node ---")
+    console.print("\n--- 📝 Implementation Planning Node ---", style="bold cyan")
     idea = state["chosen_idea"]
     brainstorm_type = state["brainstorm_type"]
     llm = state["llm"]
@@ -46,18 +47,20 @@ async def implementation_planning_node(state: GraphState) -> Dict[str, Any]:
         if mermaid_match:
             mermaid_chart = mermaid_match.group(1).strip()
             markdown_plan = final_plan_text.replace(mermaid_match.group(0), "").strip()
-            print("\n--- Generated Mermaid Flowchart ---")
-            print(
-                "Copy the code below and paste it into a Mermaid.js renderer (e.g., https://mermaid.live)"
+            console.print("\n--- Generated Mermaid Flowchart ---", style="bold magenta")
+            console.print(
+                "Copy the code below and paste it into a Mermaid.js renderer (e.g., https://mermaid.live)",
+                style="white",
             )
-            print(f"```mermaid\n{mermaid_chart}\n```")
+            console.print(f"```mermaid\n{mermaid_chart}\n```")
 
-        print(
-            f"\n--- Generated {brainstorm_type.replace('_', ' ').title()} Outline ---"
+        console.print(
+            f"\n--- Generated {brainstorm_type.replace('_', ' ').title()} Outline ---",
+            style="bold green",
         )
-        print(markdown_plan)
+        console.print(markdown_plan)
 
         return {"final_plan_text": final_plan_text}
     except Exception as e:
-        print(f"❌ Error generating final document: {e}")
+        console.print(f"❌ Error generating final document: {e}", style="red")
         return {"final_plan_text": "Error during plan generation."}

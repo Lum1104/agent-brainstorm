@@ -4,6 +4,7 @@ import pypdf
 import datetime
 from pathlib import Path
 from typing import Dict, Any
+from brainstorm.utils.ui import console
 import asyncio
 
 from langchain.prompts import PromptTemplate
@@ -34,8 +35,8 @@ async def process_pdf_node(state: GraphState) -> Dict[str, Any]:
     if pdf_path.startswith("~"):
         pdf_path = pdf_path.replace("~", str(Path.home()), 1)
 
-    print(f"📄 PDF path provided: {pdf_path}")
-    print(f"\n--- 📄 Processing PDF: {pdf_path} ---")
+    console.print(f"📄 PDF path provided: {pdf_path}")
+    console.print(f"\n--- 📄 Processing PDF: {pdf_path} ---", style="bold cyan")
     try:
         with open(pdf_path, "rb") as f:
             reader = pypdf.PdfReader(f)
@@ -45,17 +46,24 @@ async def process_pdf_node(state: GraphState) -> Dict[str, Any]:
                 if extracted:
                     pdf_text += extracted + "\n\n"
         if pdf_text:
-            print("✅ PDF text successfully extracted.")
+            console.print("✅ PDF text successfully extracted.", style="green")
             return {"pdf_text": pdf_text}
         else:
-            print("⚠️ Could not extract text from PDF. Continuing without it.")
+            console.print(
+                "⚠️ Could not extract text from PDF. Continuing without it.",
+                style="yellow",
+            )
             return {"pdf_text": None}
     except FileNotFoundError:
-        print(f"❌ Error: The file '{pdf_path}' was not found. Continuing without it.")
+        console.print(
+            f"❌ Error: The file '{pdf_path}' was not found. Continuing without it.",
+            style="red",
+        )
         return {"pdf_text": None}
     except Exception as e:
-        print(
-            f"❌ An error occurred while reading the PDF: {e}. Continuing without it."
+        console.print(
+            f"❌ An error occurred while reading the PDF: {e}. Continuing without it.",
+            style="red",
         )
         return {"pdf_text": None}
 
@@ -64,7 +72,7 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
     """
     Generates a combined context from a web search and an optional user-provided PDF.
     """
-    print("\n--- 🌐 Context Generation Node ---")
+    console.print("\n--- 🌐 Context Generation Node ---", style="bold cyan")
     topic = state["topic"]
     pdf_text = state.get("pdf_text")
     llm = state["llm"]
@@ -86,9 +94,12 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
         search_concepts = [
             concept.strip() for concept in concepts_str.split(",") if concept.strip()
         ]
-        print(f"--- 🔍 Identified concepts for search: {search_concepts} ---")
+        console.print(
+            f"--- 🔍 Identified concepts for search: {search_concepts} ---",
+            style="bold",
+        )
     except Exception as e:
-        print(f"❌ Error during concept extraction: {e}")
+        console.print(f"❌ Error during concept extraction: {e}", style="red")
         search_concepts = [topic]
 
     all_search_results = []
@@ -98,16 +109,16 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
                 search_results = search.run(concept)
                 if search_results:
                     all_search_results.append(search_results)
-                    print(f"✅ Found results for concept '{concept}'.")
+                    console.print(f"✅ Found results for concept '{concept}'.", style="green")
                 else:
-                    print(f"⚠️ No results found for concept '{concept}'.")
+                    console.print(f"⚠️ No results found for concept '{concept}'.", style="yellow")
                 break
             except Exception as e:
                 if "Ratelimit" in str(e):
-                    print("⚠️ Rate limit reached. Retrying after a short delay...")
+                    console.print("⚠️ Rate limit reached. Retrying after a short delay...", style="yellow")
                     await asyncio.sleep(3)
                 else:
-                    print(f"❌ Error during concept extraction: {e}")
+                    console.print(f"❌ Error during concept extraction: {e}", style="red")
                     break
 
     web_context = "\n\n".join(all_search_results)
@@ -129,11 +140,11 @@ async def context_generation_node(state: GraphState) -> Dict[str, Any]:
                 f"\n\n---\n\n**Uploaded Document Context:**\n{pdf_summary}"
             )
 
-        print("\n--- Combined Context Summary ---")
-        print(combined_context)
+        console.print("\n--- Combined Context Summary ---", style="bold magenta")
+        console.print(combined_context)
         return {"combined_context": combined_context}
     except Exception as e:
-        print(f"❌ Error during context generation: {e}")
+        console.print(f"❌ Error during context generation: {e}", style="red")
         return {"combined_context": "No summary could be generated."}
 
 
@@ -160,7 +171,7 @@ async def arxiv_search_node(state: GraphState) -> Dict[str, Any]:
 
     search_query = idea["title"]
 
-    print("\n--- 📚 Searching ArXiv for relevant papers... ---")
+    console.print("\n--- 📚 Searching ArXiv for relevant papers... ---", style="bold cyan")
 
     try:
         arxiv_loader = ArxivLoader(
@@ -178,8 +189,9 @@ async def arxiv_search_node(state: GraphState) -> Dict[str, Any]:
                         f"**Paper: {doc.metadata.get('Title', 'N/A')}**\nAbstract: {doc.page_content.replace('\n', ' ') or 'N/A'}"
                     )
                 else:
-                    print(
-                        f"Skipping paper '{doc.metadata.get('Title', 'N/A')}' published on {published_date} (older than 2 years)"
+                    console.print(
+                        f"Skipping paper '{doc.metadata.get('Title', 'N/A')}' published on {published_date} (older than 2 years)",
+                        style="yellow",
                     )
 
             if summaries:
@@ -187,8 +199,8 @@ async def arxiv_search_node(state: GraphState) -> Dict[str, Any]:
                     "**Relevant Research from ArXiv:**\n\n"
                     + "\n\n---\n\n".join(summaries)
                 )
-                print(arxiv_context)
+                console.print(arxiv_context)
     except Exception as e:
-        print(f"❌ Error during ArXiv search: {e}")
+        console.print(f"❌ Error during ArXiv search: {e}", style="red")
 
     return {"arxiv_context": arxiv_context}

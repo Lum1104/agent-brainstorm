@@ -4,6 +4,7 @@
 import re
 from typing import Optional
 from brainstorm.agents.state import GraphState
+from brainstorm.utils.ui import console
 
 # Try to import pypdf, but handle the case where it's not installed.
 try:
@@ -15,8 +16,8 @@ except ImportError:
 def get_pdf_text(pdf_path: str) -> Optional[str]:
     """Extracts text from a PDF file."""
     if not pypdf:
-        print("⚠️ 'pypdf' library not found. PDF processing is disabled.")
-        print("   Please install it with: pip install pypdf")
+        console.print("⚠️ 'pypdf' library not found. PDF processing is disabled.", style="yellow")
+        console.print("   Please install it with: pip install pypdf", style="yellow")
         return None
     try:
         with open(pdf_path, "rb") as f:
@@ -28,10 +29,10 @@ def get_pdf_text(pdf_path: str) -> Optional[str]:
                     text += extracted + "\n\n"
             return text
     except FileNotFoundError:
-        print(f"❌ Error: The file '{pdf_path}' was not found.")
+        console.print(f"❌ Error: The file '{pdf_path}' was not found.", style="red")
         return None
     except Exception as e:
-        print(f"❌ An error occurred while reading the PDF: {e}")
+        console.print(f"❌ An error occurred while reading the PDF: {e}", style="red")
         return None
 
 
@@ -114,6 +115,6 @@ def save_markdown_file(filename: str, content: str):
         )
         with open(filename, "w", encoding="utf-8") as f:
             f.write(content)
-        print(f"\n✅ Session successfully saved to '{filename}'")
+        console.print(f"\n✅ Session successfully saved to '{filename}'", style="bold green")
     except Exception as e:
-        print(f"\n❌ Error saving file: {e}")
+        console.print(f"\n❌ Error saving file: {e}", style="red")

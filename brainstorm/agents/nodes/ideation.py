@@ -2,6 +2,7 @@
 
 import asyncio
 from typing import Dict, Any, List, Optional
+from brainstorm.utils.ui import console
 
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
@@ -13,7 +14,7 @@ from ..state import GraphState
 
 async def persona_generation_node(state: GraphState) -> Dict[str, Any]:
     """Generates a team of distinct expert personas for a given topic."""
-    print("\n--- 🧑‍💼 Persona Generation Node ---")
+    console.print("\n--- 🧑‍💼 Persona Generation Node ---", style="bold cyan")
     topic = state["topic"]
     combined_context = state["combined_context"]
     brainstorm_type = state["brainstorm_type"]
@@ -33,18 +34,18 @@ async def persona_generation_node(state: GraphState) -> Dict[str, Any]:
         )
         personas = response["personas"]
         for p in personas:
-            print(
+            console.print(
                 f"- Role: {p['Role']}\n  Goal: {p['Goal']}\n  Backstory: {p['Backstory']}\n"
             )
         return {"personas": personas}
     except Exception as e:
-        print(f"❌ Error in Persona Generation Node: {e}")
+        console.print(f"❌ Error in Persona Generation Node: {e}", style="red")
         return {"personas": []}
 
 
 async def divergent_ideation_node(state: GraphState) -> Dict[str, Any]:
     """Generates a wide range of ideas from the perspective of each persona."""
-    print("\n--- 💡 Divergent Ideation Node ---")
+    console.print("\n--- 💡 Divergent Ideation Node ---", style="bold cyan")
     topic = state["topic"]
     personas = state["personas"]
     combined_context = state["combined_context"]
@@ -83,10 +84,15 @@ async def divergent_ideation_node(state: GraphState) -> Dict[str, Any]:
                 idea_with_context["Role"] = persona["Role"]
                 ideas_with_context.append(idea_with_context)
 
-            print(f"✅ Ideas successfully generated and parsed for {persona['Role']}.")
+            console.print(
+                f"✅ Ideas successfully generated and parsed for {persona['Role']}.",
+                style="green",
+            )
             return ideas_with_context
         except Exception as e:
-            print(f"❌ Error generating ideas for {persona['Role']}: {e}")
+            console.print(
+                f"❌ Error generating ideas for {persona['Role']}: {e}", style="red"
+            )
             return None
 
     results_from_personas = await asyncio.gather(
@@ -95,5 +101,8 @@ async def divergent_ideation_node(state: GraphState) -> Dict[str, Any]:
     all_generated_ideas = [
         idea for sublist in results_from_personas if sublist for idea in sublist
     ]
-    print(f"\nTotal ideas generated across all personas: {len(all_generated_ideas)}\n")
+    console.print(
+        f"\nTotal ideas generated across all personas: {len(all_generated_ideas)}\n",
+        style="bold",
+    )
     return {"all_generated_ideas": all_generated_ideas}
